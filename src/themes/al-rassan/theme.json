@@ -1,0 +1,2289 @@
+{
+  "id": "al-rassan",
+  "name": "The Lions of Al Rassan",
+  "description": "A turn-based civilization game set in a fantasy analog of medieval Iberia. Three faiths and five kingdoms circle one another as a golden age ends — and something dark gathers across the sea.",
+  "source": "Inspired by 'The Lions of Al Rassan' by Guy Gavriel Kay",
+  "civilizations": [
+    {
+      "id": "ragosa",
+      "name": "Kingdom of Ragosa",
+      "description": "The most cultured of the Asharite kingdoms, Ragosa is a city of scholars, poets, and merchants. Rich in dinars and faith, it has long maintained a precarious peace through diplomacy and patronage.",
+      "color": "#C9A84C",
+      "startingResources": {
+        "dinars": 60,
+        "grain": 30,
+        "soldiers": 20,
+        "faith": 20,
+        "trade_goods": 15,
+        "horses": 10
+      },
+      "startingTechs": ["trade-networks", "patronage-arts"],
+      "uniqueUnits": [],
+      "uniqueBuildings": ["library", "observatory"],
+      "specialAbilities": [
+        "Cultural Patronage: Gain +10% faith when constructing cultural buildings",
+        "City of Scholars: Libraries cost 10 dinars less to build"
+      ],
+      "flavor": "The city of Ragosa shines gold in the afternoon light, its minarets and counting-houses rising above the river. Here the poets compose, the physicians study, and the Kindath trade in peace. It cannot last."
+    },
+    {
+      "id": "cartada",
+      "name": "Emirate of Cartada",
+      "description": "The most aggressive of the Asharite kingdoms, Cartada's armies are feared from the northern passes to the southern straits. It hungers for the ruins of the old Caliphate.",
+      "color": "#8B1A1A",
+      "startingResources": {
+        "dinars": 30,
+        "grain": 30,
+        "soldiers": 50,
+        "faith": 15,
+        "trade_goods": 10,
+        "horses": 20
+      },
+      "startingTechs": ["levy-infantry", "horsemanship"],
+      "uniqueUnits": ["siege-crew"],
+      "uniqueBuildings": [],
+      "specialAbilities": [
+        "Aggressive Expansion: Units gain +5 combat strength when attacking",
+        "City of Swords: Barracks cost 10 dinars less to build"
+      ],
+      "flavor": "Cartada's banner is the red sword on black. Its Emir has unified the western Asharite cities through conquest and fear. His ambitions do not stop at the borders of Al Rassan."
+    },
+    {
+      "id": "valledo",
+      "name": "Kingdom of Valledo",
+      "description": "The strongest of the Jaddite kingdoms, Valledo's knights and cavalry press south in the name of Jad. Its faith is burning and its armies are disciplined.",
+      "color": "#1A3A6B",
+      "startingResources": {
+        "dinars": 30,
+        "grain": 35,
+        "soldiers": 35,
+        "faith": 40,
+        "trade_goods": 10,
+        "horses": 25
+      },
+      "startingTechs": ["levy-infantry", "horsemanship", "patronage-arts"],
+      "uniqueUnits": ["knight-commander"],
+      "uniqueBuildings": [],
+      "specialAbilities": [
+        "Reconquista Drive: Gain +10 faith when capturing Asharite settlements",
+        "Mountain Fortress: Units defending in mountains gain +10 combat strength"
+      ],
+      "flavor": "The kings of Valledo kneel before the disk of Jad and rise with fire in their eyes. They speak of reclaiming the peninsula. They are no longer speaking only in prayers."
+    },
+    {
+      "id": "ruenda",
+      "name": "Kingdom of Ruenda",
+      "description": "The Jaddite kingdom of the eastern coast, Ruenda is a kingdom of merchants and cavalry. It trades as readily as it fights, and its horses are the finest in the peninsula.",
+      "color": "#5B2E8C",
+      "startingResources": {
+        "dinars": 40,
+        "grain": 30,
+        "soldiers": 30,
+        "faith": 20,
+        "trade_goods": 20,
+        "horses": 40
+      },
+      "startingTechs": ["trade-networks", "horsemanship"],
+      "uniqueUnits": ["war-galley"],
+      "uniqueBuildings": ["port"],
+      "specialAbilities": [
+        "Merchant Cavalry: Trade route income is boosted when horses are plentiful",
+        "Sea Traders: Ports generate +2 extra trade_goods per turn"
+      ],
+      "flavor": "Ruenda sits astride the coastal road and grows rich from it. Its king is practical: alliances are tools, wars are expenses, and the sea is an opportunity."
+    },
+    {
+      "id": "kindath",
+      "name": "The Kindath",
+      "description": "The silver-robed wanderers, the Kindath are physicians, merchants, and astronomers. They have no kingdom, only a quarter in every city. Rich in trade goods and dinars, they have no army — only their wits.",
+      "color": "#B0B0B8",
+      "startingResources": {
+        "dinars": 70,
+        "grain": 20,
+        "soldiers": 5,
+        "faith": 20,
+        "trade_goods": 50,
+        "horses": 5
+      },
+      "startingTechs": ["trade-networks"],
+      "uniqueUnits": ["court-guard"],
+      "uniqueBuildings": ["kindath-counting-house"],
+      "specialAbilities": [
+        "Diaspora Network: Generate +1 dinars from every friendly settlement on the map",
+        "Silver Road: May offer trade deals with any civ regardless of diplomatic state"
+      ],
+      "flavor": "The Kindath follow the two moons that are their holy symbol. They are welcome everywhere and safe nowhere. They have survived three hundred years of al-Rassan by being indispensable."
+    }
+  ],
+  "map": {
+    "cols": 22,
+    "rows": 16,
+    "seaEdge": true,
+    "defaultTerrainWeights": {
+      "plains": 40,
+      "mountains": 10,
+      "forest": 15,
+      "desert": 15,
+      "coast": 15,
+      "river": 5
+    },
+    "settlementAnchors": [
+      {
+        "id": "ragosa-capital",
+        "name": "Ragosa",
+        "type": "capital",
+        "approxCol": 11,
+        "approxRow": 12,
+        "civilizationId": "ragosa",
+        "isCapital": true,
+        "startingPopulation": 5,
+        "startingStability": 75,
+        "startingBuildings": ["granary", "market", "library", "mosque"]
+      },
+      {
+        "id": "ragosa-port",
+        "name": "Fezana",
+        "type": "city",
+        "approxCol": 15,
+        "approxRow": 13,
+        "civilizationId": "ragosa",
+        "isCapital": false,
+        "startingPopulation": 3,
+        "startingStability": 65,
+        "startingBuildings": ["granary", "market"]
+      },
+      {
+        "id": "cartada-capital",
+        "name": "Cartada",
+        "type": "capital",
+        "approxCol": 5,
+        "approxRow": 11,
+        "civilizationId": "cartada",
+        "isCapital": true,
+        "startingPopulation": 5,
+        "startingStability": 65,
+        "startingBuildings": ["granary", "barracks", "stables"]
+      },
+      {
+        "id": "cartada-fortress",
+        "name": "Silvenes",
+        "type": "city",
+        "approxCol": 8,
+        "approxRow": 13,
+        "civilizationId": "cartada",
+        "isCapital": false,
+        "startingPopulation": 3,
+        "startingStability": 60,
+        "startingBuildings": ["granary", "barracks"]
+      },
+      {
+        "id": "valledo-capital",
+        "name": "Esteren",
+        "type": "capital",
+        "approxCol": 7,
+        "approxRow": 3,
+        "civilizationId": "valledo",
+        "isCapital": true,
+        "startingPopulation": 5,
+        "startingStability": 70,
+        "startingBuildings": ["granary", "barracks", "stables", "mosque"]
+      },
+      {
+        "id": "valledo-fortress",
+        "name": "Carcasia",
+        "type": "city",
+        "approxCol": 4,
+        "approxRow": 5,
+        "civilizationId": "valledo",
+        "isCapital": false,
+        "startingPopulation": 3,
+        "startingStability": 60,
+        "startingBuildings": ["granary", "barracks"]
+      },
+      {
+        "id": "ruenda-capital",
+        "name": "Batiara",
+        "type": "capital",
+        "approxCol": 15,
+        "approxRow": 3,
+        "civilizationId": "ruenda",
+        "isCapital": true,
+        "startingPopulation": 5,
+        "startingStability": 70,
+        "startingBuildings": ["granary", "market", "stables"]
+      },
+      {
+        "id": "ruenda-port",
+        "name": "Salos",
+        "type": "city",
+        "approxCol": 18,
+        "approxRow": 7,
+        "civilizationId": "ruenda",
+        "isCapital": false,
+        "startingPopulation": 3,
+        "startingStability": 65,
+        "startingBuildings": ["granary", "market"]
+      },
+      {
+        "id": "kindath-quarter",
+        "name": "The Kindath Quarter",
+        "type": "city",
+        "approxCol": 11,
+        "approxRow": 8,
+        "civilizationId": "kindath",
+        "isCapital": true,
+        "startingPopulation": 3,
+        "startingStability": 60,
+        "startingBuildings": ["granary", "market", "kindath-counting-house"]
+      },
+      {
+        "id": "qurtaba-ruins",
+        "name": "Qurtaba",
+        "type": "city",
+        "approxCol": 10,
+        "approxRow": 11,
+        "civilizationId": "",
+        "isCapital": false,
+        "startingPopulation": 2,
+        "startingStability": 30,
+        "startingBuildings": ["granary"]
+      },
+      {
+        "id": "outpost-north",
+        "name": "Iron Pass",
+        "type": "outpost",
+        "approxCol": 10,
+        "approxRow": 5,
+        "civilizationId": "",
+        "isCapital": false,
+        "startingPopulation": 1,
+        "startingStability": 40,
+        "startingBuildings": []
+      },
+      {
+        "id": "outpost-south",
+        "name": "Cape Varena",
+        "type": "outpost",
+        "approxCol": 17,
+        "approxRow": 13,
+        "civilizationId": "",
+        "isCapital": false,
+        "startingPopulation": 1,
+        "startingStability": 40,
+        "startingBuildings": []
+      }
+    ],
+    "zones": [
+      {
+        "id": "northern-highlands",
+        "name": "The Northern Highlands",
+        "shape": { "kind": "bounds", "minCol": 1, "maxCol": 21, "minRow": 2, "maxRow": 5 },
+        "terrainWeights": { "mountains": 40, "forest": 30, "plains": 20, "river": 10 },
+        "initialControlledBy": null
+      },
+      {
+        "id": "central-plains",
+        "name": "The Central Plains",
+        "shape": { "kind": "bounds", "minCol": 1, "maxCol": 21, "minRow": 6, "maxRow": 10 },
+        "terrainWeights": { "plains": 50, "river": 20, "forest": 15, "desert": 10, "coast": 5 },
+        "initialControlledBy": null
+      },
+      {
+        "id": "southern-heartland",
+        "name": "The Southern Heartland",
+        "shape": { "kind": "bounds", "minCol": 1, "maxCol": 21, "minRow": 11, "maxRow": 14 },
+        "terrainWeights": { "plains": 45, "desert": 25, "coast": 20, "river": 10 },
+        "initialControlledBy": null
+      },
+      {
+        "id": "western-coast",
+        "name": "The Western Coast",
+        "shape": { "kind": "bounds", "minCol": 1, "maxCol": 5, "minRow": 6, "maxRow": 14 },
+        "terrainWeights": { "coast": 50, "plains": 30, "desert": 20 },
+        "initialControlledBy": null
+      },
+      {
+        "id": "eastern-coast",
+        "name": "The Eastern Coast",
+        "shape": { "kind": "bounds", "minCol": 17, "maxCol": 21, "minRow": 6, "maxRow": 14 },
+        "terrainWeights": { "coast": 50, "plains": 30, "river": 20 },
+        "initialControlledBy": null
+      },
+      {
+        "id": "deep-south",
+        "name": "The Deep South",
+        "shape": { "kind": "bounds", "minCol": 3, "maxCol": 19, "minRow": 13, "maxRow": 14 },
+        "terrainWeights": { "desert": 40, "coast": 30, "plains": 30 },
+        "initialControlledBy": null
+      }
+    ]
+  },
+  "resources": [
+    {
+      "id": "dinars",
+      "name": "Dinars",
+      "description": "Currency and trade wealth. Dinars flow through the great markets of Al Rassan, funding armies, bribing enemies, and building wonders.",
+      "baseYield": 0,
+      "terrainYields": {
+        "plains": 1,
+        "desert": 1,
+        "coast": 3,
+        "river": 2,
+        "sea": 1
+      }
+    },
+    {
+      "id": "grain",
+      "name": "Grain",
+      "description": "Food and population support. Without grain, cities starve, armies dissolve, and kingdoms fall.",
+      "baseYield": 0,
+      "terrainYields": {
+        "plains": 3,
+        "forest": 1,
+        "coast": 1,
+        "river": 4
+      }
+    },
+    {
+      "id": "soldiers",
+      "name": "Soldiers",
+      "description": "Military manpower. Every levy raised, every fort garrisoned, every wall defended costs soldiers.",
+      "baseYield": 0,
+      "terrainYields": {
+        "plains": 2,
+        "mountains": 1,
+        "forest": 1,
+        "desert": 1
+      }
+    },
+    {
+      "id": "faith",
+      "name": "Faith",
+      "description": "Religious and cultural influence. Faith inspires sacrifice, justifies conquest, and binds a people together — or tears them apart.",
+      "baseYield": 0,
+      "terrainYields": {
+        "plains": 1,
+        "mountains": 2,
+        "forest": 1,
+        "desert": 2
+      }
+    },
+    {
+      "id": "trade_goods",
+      "name": "Trade Goods",
+      "description": "Luxury goods from ports and cities. Silk, spice, silver, and dye — the wealth that cannot be made by sword.",
+      "baseYield": 0,
+      "terrainYields": {
+        "coast": 4,
+        "river": 2,
+        "sea": 1
+      }
+    },
+    {
+      "id": "horses",
+      "name": "Horses",
+      "description": "Cavalry production. The great horse herds of Al Rassan are the foundation of its armies. A kingdom without horses is a kingdom on foot.",
+      "baseYield": 0,
+      "terrainYields": {
+        "plains": 3,
+        "desert": 2,
+        "river": 1
+      }
+    }
+  ],
+  "techTree": [
+    {
+      "id": "crop-rotation",
+      "name": "Crop Rotation",
+      "description": "Systematic alternation of crops to restore soil fertility and increase yields.",
+      "cost": 30,
+      "prerequisites": [],
+      "effects": [
+        { "kind": "resource_modifier", "resourceId": "grain", "multiplier": 1.25 }
+      ],
+      "era": "The Fragile Peace"
+    },
+    {
+      "id": "trade-networks",
+      "name": "Trade Networks",
+      "description": "Organized routes linking cities, enabling efficient movement of goods and currency.",
+      "cost": 35,
+      "prerequisites": [],
+      "effects": [
+        { "kind": "resource_modifier", "resourceId": "dinars", "multiplier": 1.2 },
+        { "kind": "resource_modifier", "resourceId": "trade_goods", "multiplier": 1.15 }
+      ],
+      "era": "The Fragile Peace"
+    },
+    {
+      "id": "city-walls",
+      "name": "City Walls",
+      "description": "Permanent stone fortifications encircling settlements to resist siege and assault.",
+      "cost": 40,
+      "prerequisites": [],
+      "effects": [
+        { "kind": "unlock_building", "buildingDefinitionId": "stone-walls" }
+      ],
+      "era": "The Fragile Peace"
+    },
+    {
+      "id": "levy-infantry",
+      "name": "Levy Infantry",
+      "description": "Organization and training of citizen levies into effective infantry formations.",
+      "cost": 25,
+      "prerequisites": [],
+      "effects": [
+        { "kind": "unlock_unit", "unitDefinitionId": "levy-spearman" }
+      ],
+      "era": "The Fragile Peace"
+    },
+    {
+      "id": "horsemanship",
+      "name": "Horsemanship",
+      "description": "Advanced techniques of horse breeding and cavalry training.",
+      "cost": 35,
+      "prerequisites": [],
+      "effects": [
+        { "kind": "unlock_unit", "unitDefinitionId": "light-cavalry" },
+        { "kind": "resource_modifier", "resourceId": "horses", "multiplier": 1.1 }
+      ],
+      "era": "The Fragile Peace"
+    },
+    {
+      "id": "siege-craft",
+      "name": "Siege Craft",
+      "description": "The art of taking fortified positions — ladders, rams, and the first crude siege engines.",
+      "cost": 50,
+      "prerequisites": ["levy-infantry"],
+      "effects": [
+        { "kind": "unlock_unit", "unitDefinitionId": "siege-crew" },
+        { "kind": "combat_modifier", "value": 5 }
+      ],
+      "era": "The Fragile Peace"
+    },
+    {
+      "id": "patronage-arts",
+      "name": "Patronage of the Arts",
+      "description": "Royal support for poets, scholars, and architects, raising cultural prestige.",
+      "cost": 30,
+      "prerequisites": ["trade-networks"],
+      "effects": [
+        { "kind": "resource_modifier", "resourceId": "faith", "multiplier": 1.2 },
+        { "kind": "stability_modifier", "value": 5 }
+      ],
+      "era": "The Fragile Peace"
+    },
+    {
+      "id": "irrigation",
+      "name": "Irrigation",
+      "description": "Canal systems and water wheels that bring river water to arid fields.",
+      "cost": 40,
+      "prerequisites": ["crop-rotation"],
+      "effects": [
+        { "kind": "resource_modifier", "resourceId": "grain", "multiplier": 1.2 },
+        { "kind": "unlock_building", "buildingDefinitionId": "water-wheel" }
+      ],
+      "era": "The Fragile Peace"
+    },
+    {
+      "id": "shipbuilding",
+      "name": "Shipbuilding",
+      "description": "The construction of seaworthy vessels for trade and war on the Inner Sea.",
+      "cost": 45,
+      "prerequisites": ["trade-networks"],
+      "effects": [
+        { "kind": "unlock_unit", "unitDefinitionId": "war-galley" },
+        { "kind": "resource_modifier", "resourceId": "trade_goods", "multiplier": 1.15 }
+      ],
+      "era": "The Fragile Peace"
+    },
+    {
+      "id": "border-scouts",
+      "name": "Border Scouts",
+      "description": "Light skirmishers trained to range ahead of armies and report on enemy movements.",
+      "cost": 25,
+      "prerequisites": [],
+      "effects": [
+        { "kind": "unlock_unit", "unitDefinitionId": "scout" },
+        { "kind": "custom", "key": "movement_range_bonus", "value": 1 }
+      ],
+      "era": "The Fragile Peace"
+    },
+    {
+      "id": "professional-army",
+      "name": "Professional Army",
+      "description": "Standing armies of paid soldiers replacing the seasonal levies of the old order.",
+      "cost": 70,
+      "prerequisites": ["levy-infantry", "horsemanship"],
+      "effects": [
+        { "kind": "unlock_unit", "unitDefinitionId": "heavy-cavalry" },
+        { "kind": "resource_modifier", "resourceId": "soldiers", "multiplier": 1.15 }
+      ],
+      "era": "The Unraveling"
+    },
+    {
+      "id": "religious-zeal",
+      "name": "Religious Zeal",
+      "description": "The hardening of faith into ideology — soldiers who fight for their god, not their king.",
+      "cost": 60,
+      "prerequisites": ["patronage-arts"],
+      "effects": [
+        { "kind": "resource_modifier", "resourceId": "faith", "multiplier": 1.3 },
+        { "kind": "custom", "key": "combat_bonus_vs_opposing_religion", "value": 10 }
+      ],
+      "era": "The Unraveling"
+    },
+    {
+      "id": "diplomatic-court",
+      "name": "Diplomatic Court",
+      "description": "Formal institutions for receiving ambassadors and conducting statecraft.",
+      "cost": 55,
+      "prerequisites": ["trade-networks"],
+      "effects": [
+        { "kind": "stability_modifier", "value": 10 },
+        { "kind": "unlock_building", "buildingDefinitionId": "embassy" }
+      ],
+      "era": "The Unraveling"
+    },
+    {
+      "id": "heavy-artillery",
+      "name": "Heavy Artillery",
+      "description": "The trebuchet and its kin — city-smashing engines that redefine what walls mean.",
+      "cost": 80,
+      "prerequisites": ["siege-craft"],
+      "effects": [
+        { "kind": "unlock_unit", "unitDefinitionId": "trebuchet" },
+        { "kind": "custom", "key": "siege_combat_bonus", "value": 20 }
+      ],
+      "era": "The Unraveling"
+    },
+    {
+      "id": "spice-trade",
+      "name": "Spice Trade Routes",
+      "description": "Secured routes for the lucrative eastern spice trade, enriching coastal kingdoms.",
+      "cost": 65,
+      "prerequisites": ["shipbuilding", "trade-networks"],
+      "effects": [
+        { "kind": "resource_modifier", "resourceId": "dinars", "multiplier": 1.3 },
+        { "kind": "resource_modifier", "resourceId": "trade_goods", "multiplier": 1.25 }
+      ],
+      "era": "The Unraveling"
+    },
+    {
+      "id": "fortified-cities",
+      "name": "Fortified Cities",
+      "description": "The full transformation of a city into a fortress, with towers, moats, and killing grounds.",
+      "cost": 75,
+      "prerequisites": ["city-walls"],
+      "effects": [
+        { "kind": "unlock_building", "buildingDefinitionId": "citadel" },
+        { "kind": "stability_modifier", "value": 5 }
+      ],
+      "era": "The Unraveling"
+    },
+    {
+      "id": "astronomy",
+      "name": "Astronomy",
+      "description": "The study of the heavens — navigation, calendar, and a deeper understanding of the divine order.",
+      "cost": 50,
+      "prerequisites": ["patronage-arts"],
+      "effects": [
+        { "kind": "resource_modifier", "resourceId": "faith", "multiplier": 1.1 },
+        { "kind": "unlock_building", "buildingDefinitionId": "observatory" }
+      ],
+      "era": "The Unraveling"
+    },
+    {
+      "id": "military-orders",
+      "name": "Military Orders",
+      "description": "Holy knights and warrior-monks who combine religious devotion with martial excellence.",
+      "cost": 70,
+      "prerequisites": ["religious-zeal", "professional-army"],
+      "effects": [
+        { "kind": "unlock_unit", "unitDefinitionId": "knight-commander" },
+        { "kind": "combat_modifier", "value": 15 }
+      ],
+      "era": "The Unraveling"
+    },
+    {
+      "id": "tax-reform",
+      "name": "Tax Reform",
+      "description": "Restructured tax collection that raises revenue but breeds resentment among the taxed.",
+      "cost": 55,
+      "prerequisites": ["diplomatic-court"],
+      "effects": [
+        { "kind": "resource_modifier", "resourceId": "dinars", "multiplier": 1.25 },
+        { "kind": "stability_modifier", "value": -5 }
+      ],
+      "era": "The Unraveling"
+    },
+    {
+      "id": "cavalry-tactics",
+      "name": "Cavalry Tactics",
+      "description": "Refined doctrines of cavalry use — flanking, pursuit, and the coordinated charge.",
+      "cost": 65,
+      "prerequisites": ["professional-army"],
+      "effects": [
+        { "kind": "resource_modifier", "resourceId": "horses", "multiplier": 1.2 },
+        { "kind": "custom", "key": "cavalry_combat_bonus", "value": 20 }
+      ],
+      "era": "The Unraveling"
+    },
+    {
+      "id": "grain-reserve",
+      "name": "Grain Reserve",
+      "description": "Strategic stores of grain that protect against famine and winter starvation.",
+      "cost": 50,
+      "prerequisites": ["irrigation", "crop-rotation"],
+      "effects": [
+        { "kind": "resource_modifier", "resourceId": "grain", "multiplier": 1.15 },
+        { "kind": "custom", "key": "stability_bonus_winter", "value": 10 }
+      ],
+      "era": "The Unraveling"
+    },
+    {
+      "id": "mercenary-bonds",
+      "name": "Mercenary Contracts",
+      "description": "Legal and financial frameworks for hiring and retaining professional mercenary companies.",
+      "cost": 60,
+      "prerequisites": ["diplomatic-court"],
+      "effects": [
+        { "kind": "unlock_unit", "unitDefinitionId": "mercenary-company" }
+      ],
+      "era": "The Unraveling"
+    },
+    {
+      "id": "holy-war",
+      "name": "Holy War",
+      "description": "The religious sanction of total war against the unbeliever — every soldier a martyr.",
+      "cost": 100,
+      "prerequisites": ["religious-zeal", "military-orders"],
+      "effects": [
+        { "kind": "combat_modifier", "value": 25 },
+        { "kind": "custom", "key": "war_declaration_faith_cost", "value": 0 }
+      ],
+      "era": "The Last Light"
+    },
+    {
+      "id": "muwardi-resistance",
+      "name": "Resistance to the Muwardis",
+      "description": "Hardened tactics and fortifications developed specifically to counter the Muwardi invasion style.",
+      "cost": 90,
+      "prerequisites": ["fortified-cities", "professional-army"],
+      "effects": [
+        { "kind": "combat_modifier", "value": 15 },
+        { "kind": "stability_modifier", "value": 10 }
+      ],
+      "era": "The Last Light"
+    },
+    {
+      "id": "golden-age",
+      "name": "The Golden Age",
+      "description": "A flowering of art, science, and culture that will be remembered long after the kingdoms are dust.",
+      "cost": 120,
+      "prerequisites": ["astronomy", "spice-trade", "patronage-arts"],
+      "effects": [
+        { "kind": "resource_modifier", "resourceId": "dinars", "multiplier": 1.4 },
+        { "kind": "resource_modifier", "resourceId": "faith", "multiplier": 1.3 },
+        { "kind": "custom", "key": "cultural_victory_progress", "value": 1 }
+      ],
+      "era": "The Last Light"
+    },
+    {
+      "id": "grand-coalition",
+      "name": "Grand Coalition",
+      "description": "A desperate alliance of former enemies who set aside blood feuds before a greater threat.",
+      "cost": 80,
+      "prerequisites": ["diplomatic-court", "tax-reform"],
+      "effects": [
+        { "kind": "custom", "key": "allow_alliance_sworn_enemies", "value": true }
+      ],
+      "era": "The Last Light"
+    },
+    {
+      "id": "last-stand",
+      "name": "The Last Stand",
+      "description": "When your back is against the wall, the city itself becomes a weapon.",
+      "cost": 70,
+      "prerequisites": ["muwardi-resistance"],
+      "effects": [
+        { "kind": "custom", "key": "capital_defense_combat_bonus", "value": 30 }
+      ],
+      "era": "The Last Light"
+    },
+    {
+      "id": "poet-kings",
+      "name": "The Poet-Kings",
+      "description": "The final flowering of the Asharite golden age — rulers who are also artists, whose courts outshine any in the world. But something dark gathers across the sea.",
+      "cost": 85,
+      "prerequisites": ["golden-age", "astronomy"],
+      "effects": [
+        { "kind": "resource_modifier", "resourceId": "faith", "multiplier": 1.4 },
+        { "kind": "custom", "key": "trigger_event", "value": "a-golden-age-ends" }
+      ],
+      "era": "The Last Light"
+    },
+    {
+      "id": "kindath-alliance",
+      "name": "Alliance with the Kindath",
+      "description": "A formal compact with the Kindath diaspora, granting access to their vast trade networks.",
+      "cost": 75,
+      "prerequisites": ["diplomatic-court"],
+      "effects": [
+        { "kind": "resource_modifier", "resourceId": "trade_goods", "multiplier": 1.25 },
+        { "kind": "custom", "key": "kindath_vassal", "value": true }
+      ],
+      "era": "The Last Light"
+    },
+    {
+      "id": "reconquista",
+      "name": "The Reconquista",
+      "description": "The holy campaign to reclaim every inch of the peninsula for Jad — a generational crusade.",
+      "cost": 110,
+      "prerequisites": ["holy-war", "cavalry-tactics"],
+      "effects": [
+        { "kind": "custom", "key": "control_hexes_victory_reduction", "value": 20 },
+        { "kind": "custom", "key": "trigger", "value": "reconquista_active" }
+      ],
+      "era": "The Last Light"
+    }
+  ],
+  "buildings": [
+    {
+      "id": "granary",
+      "name": "Granary",
+      "description": "A fortified storehouse for grain, protecting against famine and enabling larger populations.",
+      "cost": 30,
+      "upkeep": 2,
+      "effects": [
+        { "resourceId": "grain", "delta": 4 }
+      ],
+      "prerequisiteTech": null,
+      "maxPerSettlement": 2
+    },
+    {
+      "id": "market",
+      "name": "Market",
+      "description": "A permanent trading space that attracts merchants and increases commercial activity.",
+      "cost": 35,
+      "upkeep": 3,
+      "effects": [
+        { "resourceId": "dinars", "delta": 5 },
+        { "resourceId": "trade_goods", "delta": 2 }
+      ],
+      "prerequisiteTech": "trade-networks",
+      "maxPerSettlement": 2
+    },
+    {
+      "id": "barracks",
+      "name": "Barracks",
+      "description": "Permanent training grounds that maintain a ready supply of levied soldiers.",
+      "cost": 40,
+      "upkeep": 5,
+      "effects": [
+        { "resourceId": "soldiers", "delta": 4 }
+      ],
+      "prerequisiteTech": "levy-infantry",
+      "maxPerSettlement": 1
+    },
+    {
+      "id": "stables",
+      "name": "Stables",
+      "description": "Well-managed stables for horse breeding and cavalry training.",
+      "cost": 45,
+      "upkeep": 4,
+      "effects": [
+        { "resourceId": "horses", "delta": 4 },
+        { "resourceId": "soldiers", "delta": 2 }
+      ],
+      "prerequisiteTech": "horsemanship",
+      "maxPerSettlement": 1
+    },
+    {
+      "id": "port",
+      "name": "Port",
+      "description": "A fortified harbor enabling ocean-going trade and naval operations.",
+      "cost": 50,
+      "upkeep": 4,
+      "effects": [
+        { "resourceId": "dinars", "delta": 6 },
+        { "resourceId": "trade_goods", "delta": 5 }
+      ],
+      "prerequisiteTech": "shipbuilding",
+      "maxPerSettlement": 1
+    },
+    {
+      "id": "stone-walls",
+      "name": "Stone Walls",
+      "description": "Permanent stone fortifications that make assault costly and siege necessary.",
+      "cost": 60,
+      "upkeep": 2,
+      "effects": [
+        { "resourceId": "soldiers", "delta": 1 }
+      ],
+      "prerequisiteTech": "city-walls",
+      "maxPerSettlement": 1
+    },
+    {
+      "id": "mosque",
+      "name": "Mosque / Cathedral",
+      "description": "A house of worship that raises faith and brings spiritual stability to a settlement.",
+      "cost": 40,
+      "upkeep": 3,
+      "effects": [
+        { "resourceId": "faith", "delta": 5 },
+        { "resourceId": "stability", "delta": 3 }
+      ],
+      "prerequisiteTech": "patronage-arts",
+      "maxPerSettlement": 1
+    },
+    {
+      "id": "library",
+      "name": "Library",
+      "description": "A repository of knowledge that draws scholars and raises the cultural prestige of a city.",
+      "cost": 55,
+      "upkeep": 4,
+      "effects": [
+        { "resourceId": "faith", "delta": 4 },
+        { "resourceId": "dinars", "delta": 2 }
+      ],
+      "prerequisiteTech": "patronage-arts",
+      "maxPerSettlement": 1
+    },
+    {
+      "id": "observatory",
+      "name": "Observatory",
+      "description": "A tower for studying the stars — navigation, astrology, and the sacred mathematics of the heavens.",
+      "cost": 70,
+      "upkeep": 5,
+      "effects": [
+        { "resourceId": "faith", "delta": 6 },
+        { "resourceId": "trade_goods", "delta": 3 }
+      ],
+      "prerequisiteTech": "astronomy",
+      "maxPerSettlement": 1
+    },
+    {
+      "id": "embassy",
+      "name": "Embassy",
+      "description": "Permanent quarters for foreign representatives, enabling sophisticated statecraft.",
+      "cost": 45,
+      "upkeep": 3,
+      "effects": [
+        { "resourceId": "dinars", "delta": 3 },
+        { "resourceId": "stability", "delta": 5 }
+      ],
+      "prerequisiteTech": "diplomatic-court",
+      "maxPerSettlement": 1
+    },
+    {
+      "id": "citadel",
+      "name": "Citadel",
+      "description": "A fortress within the city — a last redoubt when the walls are breached.",
+      "cost": 80,
+      "upkeep": 6,
+      "effects": [
+        { "resourceId": "soldiers", "delta": 3 }
+      ],
+      "prerequisiteTech": "fortified-cities",
+      "maxPerSettlement": 1
+    },
+    {
+      "id": "kindath-counting-house",
+      "name": "Kindath Counting House",
+      "description": "A Kindath merchant house with connections to every port and market in the known world.",
+      "cost": 35,
+      "upkeep": 2,
+      "effects": [
+        { "resourceId": "dinars", "delta": 8 },
+        { "resourceId": "trade_goods", "delta": 4 }
+      ],
+      "prerequisiteTech": "trade-networks",
+      "maxPerSettlement": 1
+    },
+    {
+      "id": "water-wheel",
+      "name": "Water Wheel",
+      "description": "A mechanical wheel driven by a river current, powering mills and irrigation channels.",
+      "cost": 40,
+      "upkeep": 2,
+      "effects": [
+        { "resourceId": "grain", "delta": 5 },
+        { "resourceId": "horses", "delta": 2 }
+      ],
+      "prerequisiteTech": "irrigation",
+      "maxPerSettlement": 2
+    },
+    {
+      "id": "siege-workshop",
+      "name": "Siege Workshop",
+      "description": "A specialized facility for building and maintaining siege engines.",
+      "cost": 60,
+      "upkeep": 5,
+      "effects": [
+        { "resourceId": "soldiers", "delta": 2 }
+      ],
+      "prerequisiteTech": "siege-craft",
+      "maxPerSettlement": 1
+    }
+  ],
+  "units": [
+    {
+      "id": "levy-spearman",
+      "name": "Levy Spearman",
+      "description": "Citizen soldiers armed with spears — the backbone of every army in Al Rassan.",
+      "cost": 20,
+      "upkeep": 2,
+      "strength": 3,
+      "morale": 4,
+      "moves": 2,
+      "prerequisiteTech": "levy-infantry",
+      "canGarrison": true,
+      "flavor": "They carry the spears their fathers carried. Most will return to the fields when the fighting is done. Most."
+    },
+    {
+      "id": "light-cavalry",
+      "name": "Light Cavalry",
+      "description": "Mounted skirmishers and raiders who strike fast and retreat faster.",
+      "cost": 35,
+      "upkeep": 4,
+      "strength": 4,
+      "morale": 5,
+      "moves": 3,
+      "prerequisiteTech": "horsemanship",
+      "canGarrison": false,
+      "flavor": "They ride like wind across the plains of Al Rassan, appearing where no army expects them."
+    },
+    {
+      "id": "scout",
+      "name": "Scout",
+      "description": "Light irregular troops trained to range ahead of armies and map terrain.",
+      "cost": 15,
+      "upkeep": 1,
+      "strength": 2,
+      "morale": 3,
+      "moves": 4,
+      "prerequisiteTech": "border-scouts",
+      "canGarrison": false,
+      "flavor": "What you do not know can kill you. Scouts are the answer to that axiom."
+    },
+    {
+      "id": "siege-crew",
+      "name": "Siege Crew",
+      "description": "Specialists in assault — carrying ladders, building rams, and creeping forward under fire.",
+      "cost": 50,
+      "upkeep": 5,
+      "strength": 5,
+      "morale": 3,
+      "moves": 1,
+      "prerequisiteTech": "siege-craft",
+      "canGarrison": false,
+      "flavor": "Slow work. Bloody work. The only work that takes a fortified city."
+    },
+    {
+      "id": "war-galley",
+      "name": "War Galley",
+      "description": "An oared fighting ship capable of ramming, boarding, and protecting trade lanes.",
+      "cost": 60,
+      "upkeep": 6,
+      "strength": 5,
+      "morale": 5,
+      "moves": 3,
+      "prerequisiteTech": "shipbuilding",
+      "canGarrison": false,
+      "flavor": "On the Inner Sea, the galley is king. He who controls the sea-lanes controls the trade."
+    },
+    {
+      "id": "heavy-cavalry",
+      "name": "Heavy Cavalry",
+      "description": "Armored horsemen capable of shattering infantry formations and overrunning artillery.",
+      "cost": 65,
+      "upkeep": 7,
+      "strength": 7,
+      "morale": 7,
+      "moves": 3,
+      "prerequisiteTech": "professional-army",
+      "canGarrison": false,
+      "flavor": "Nothing on the battlefield sounds like a charge of heavy horse. Nothing produces the same answer in the gut."
+    },
+    {
+      "id": "knight-commander",
+      "name": "Knight-Commander / Ghazi",
+      "description": "An elite warrior-leader whose faith and skill inspire nearby troops to extraordinary feats.",
+      "cost": 80,
+      "upkeep": 8,
+      "strength": 8,
+      "morale": 8,
+      "moves": 3,
+      "prerequisiteTech": "military-orders",
+      "canGarrison": true,
+      "flavor": "Whether he rides under the star of Jad or the crescent of the Ashar, he fights as if god is watching."
+    },
+    {
+      "id": "trebuchet",
+      "name": "Trebuchet",
+      "description": "A massive counterweight siege engine capable of demolishing city walls from a safe distance.",
+      "cost": 90,
+      "upkeep": 9,
+      "strength": 9,
+      "morale": 4,
+      "moves": 1,
+      "prerequisiteTech": "heavy-artillery",
+      "canGarrison": false,
+      "flavor": "The city wall that took a hundred years to build falls in a morning when the arm swings."
+    },
+    {
+      "id": "mercenary-company",
+      "name": "Mercenary Company",
+      "description": "A professional fighting force loyal to whoever pays — skilled, expensive, and reliable while the coin holds.",
+      "cost": 70,
+      "upkeep": 10,
+      "strength": 6,
+      "morale": 6,
+      "moves": 2,
+      "prerequisiteTech": "mercenary-bonds",
+      "canGarrison": true,
+      "flavor": "They fight for pay, not faith. In Al Rassan, that sometimes makes them the most trustworthy soldiers in a city."
+    },
+    {
+      "id": "court-guard",
+      "name": "Court Guard",
+      "description": "Trained bodyguards and city defenders, skilled at protecting people rather than taking ground.",
+      "cost": 30,
+      "upkeep": 3,
+      "strength": 4,
+      "morale": 6,
+      "moves": 2,
+      "prerequisiteTech": null,
+      "canGarrison": true,
+      "flavor": "The Kindath have always needed protection. They learned, long ago, to provide it for themselves."
+    }
+  ],
+  "events": [
+    {
+      "id": "drought",
+      "name": "Drought",
+      "description": "A season of no rain. The crops wither in the field and the granaries empty faster than they fill.",
+      "flavourText": "The sky has not broken in forty days. The farmers watch the horizon and pray to whatever god they follow.",
+      "trigger": { "kind": "resource_below", "resourceId": "grain", "threshold": 20 },
+      "targetCivs": "all",
+      "choices": [
+        {
+          "id": "tax_people",
+          "label": "Tax the merchants to buy grain",
+          "effects": [
+            { "kind": "resource_delta", "resourceId": "dinars", "delta": -15 },
+            { "kind": "stability_delta", "delta": -5 },
+            { "kind": "resource_delta", "resourceId": "grain", "delta": 10 }
+          ]
+        },
+        {
+          "id": "feed_them",
+          "label": "Release soldiers to work the fields",
+          "effects": [
+            { "kind": "resource_delta", "resourceId": "soldiers", "delta": -10 },
+            { "kind": "stability_delta", "delta": 5 },
+            { "kind": "resource_delta", "resourceId": "grain", "delta": 8 }
+          ]
+        }
+      ],
+      "defaultChoiceId": "tax_people",
+      "isRepeatable": true,
+      "weight": 15
+    },
+    {
+      "id": "plague-in-the-city",
+      "name": "Plague in the City",
+      "description": "A pestilence moves through the crowded streets. The physicians are overwhelmed. The dead are not yet counted.",
+      "flavourText": "They are burning the houses where the sick have died. The smoke is visible from the palace.",
+      "trigger": { "kind": "stability_below", "threshold": 30 },
+      "targetCivs": "random_one",
+      "choices": [
+        {
+          "id": "quarantine",
+          "label": "Enforce a strict quarantine",
+          "effects": [
+            { "kind": "stability_delta", "delta": -10 },
+            { "kind": "resource_delta", "resourceId": "dinars", "delta": -20 },
+            { "kind": "narrative", "text": "The gates are sealed. Trade stops. The plague is contained, at cost." }
+          ]
+        },
+        {
+          "id": "pray",
+          "label": "Open the temples and pray for deliverance",
+          "effects": [
+            { "kind": "stability_delta", "delta": -5 },
+            { "kind": "resource_delta", "resourceId": "faith", "delta": 10 },
+            { "kind": "narrative", "text": "The priests burn incense day and night. Some say it helps." }
+          ]
+        }
+      ],
+      "defaultChoiceId": "quarantine",
+      "isRepeatable": true,
+      "weight": 8
+    },
+    {
+      "id": "revolt-in-the-south",
+      "name": "Revolt in the South",
+      "description": "When stability collapses, the governed remember that they outnumber the governors.",
+      "flavourText": "The garrison commander sends a single message: the south is burning.",
+      "trigger": { "kind": "stability_below", "threshold": 30 },
+      "targetCivs": "all",
+      "choices": [
+        {
+          "id": "suppress",
+          "label": "Send the army to suppress the revolt",
+          "effects": [
+            { "kind": "stability_delta", "delta": -15 },
+            { "kind": "resource_delta", "resourceId": "soldiers", "delta": -15 },
+            { "kind": "narrative", "text": "The revolt is put down with considerable violence." }
+          ]
+        },
+        {
+          "id": "negotiate",
+          "label": "Negotiate with the rebel leaders",
+          "effects": [
+            { "kind": "stability_delta", "delta": 5 },
+            { "kind": "resource_delta", "resourceId": "dinars", "delta": -25 },
+            { "kind": "narrative", "text": "The rebels accept terms. The kingdom is weaker but still whole." }
+          ]
+        }
+      ],
+      "defaultChoiceId": "suppress",
+      "isRepeatable": true,
+      "weight": 12
+    },
+    {
+      "id": "assassination",
+      "name": "Assassination",
+      "description": "A diplomat, a general, or a beloved advisor is found dead. The timing is, of course, suspicious.",
+      "flavourText": "A knife in the dark is cheaper than an army, and more reliable.",
+      "trigger": { "kind": "war_declared" },
+      "targetCivs": "random_one",
+      "choices": [
+        {
+          "id": "grieve",
+          "label": "Mourn and investigate",
+          "effects": [
+            { "kind": "stability_delta", "delta": -5 },
+            { "kind": "narrative", "text": "The investigation yields nothing certain. Suspicion poisons the court." }
+          ]
+        },
+        {
+          "id": "retaliate",
+          "label": "Retaliate against suspected enemies",
+          "effects": [
+            { "kind": "resource_delta", "resourceId": "soldiers", "delta": -10 },
+            { "kind": "tension_delta", "axis": "religious_fervor", "delta": 10 },
+            { "kind": "narrative", "text": "Retaliation comes swift and not always accurate." }
+          ]
+        }
+      ],
+      "defaultChoiceId": "grieve",
+      "isRepeatable": true,
+      "weight": 8
+    },
+    {
+      "id": "deserters",
+      "name": "Deserters",
+      "description": "When armies are not paid or fed, soldiers find better uses for their legs.",
+      "flavourText": "Half the garrison was gone by morning. They left their spears in the armory, as if they expected to come back for them.",
+      "trigger": { "kind": "resource_below", "resourceId": "soldiers", "threshold": 5 },
+      "targetCivs": "all",
+      "choices": [
+        {
+          "id": "let_them_go",
+          "label": "Let them go — they cannot be trusted now",
+          "effects": [
+            { "kind": "resource_delta", "resourceId": "soldiers", "delta": -3 },
+            { "kind": "stability_delta", "delta": -5 }
+          ]
+        },
+        {
+          "id": "press_gang",
+          "label": "Force men into service by any means",
+          "effects": [
+            { "kind": "resource_delta", "resourceId": "dinars", "delta": -20 },
+            { "kind": "stability_delta", "delta": -10 },
+            { "kind": "resource_delta", "resourceId": "soldiers", "delta": 8 }
+          ]
+        }
+      ],
+      "defaultChoiceId": "let_them_go",
+      "isRepeatable": true,
+      "weight": 10
+    },
+    {
+      "id": "famine",
+      "name": "Famine",
+      "description": "Not drought, not war — just the slow arithmetic of too many mouths and too little grain.",
+      "flavourText": "The bread riots began in the market quarter. By evening they had reached the palace gates.",
+      "trigger": { "kind": "resource_below", "resourceId": "grain", "threshold": 10 },
+      "targetCivs": "all",
+      "choices": [
+        {
+          "id": "emergency_rations",
+          "label": "Purchase emergency grain from foreign traders",
+          "effects": [
+            { "kind": "resource_delta", "resourceId": "dinars", "delta": -30 },
+            { "kind": "resource_delta", "resourceId": "grain", "delta": 15 },
+            { "kind": "stability_delta", "delta": 5 }
+          ]
+        },
+        {
+          "id": "endure",
+          "label": "Endure — the people will understand",
+          "effects": [
+            { "kind": "stability_delta", "delta": -20 },
+            { "kind": "resource_delta", "resourceId": "soldiers", "delta": -10 },
+            { "kind": "narrative", "text": "They did not understand." }
+          ]
+        }
+      ],
+      "defaultChoiceId": "emergency_rations",
+      "isRepeatable": true,
+      "weight": 10
+    },
+    {
+      "id": "treasury-empty",
+      "name": "The Treasury Is Empty",
+      "description": "The accountants deliver their news in the smallest possible voice. There is no coin left.",
+      "flavourText": "You cannot pay the garrison. You cannot pay the merchants. You can barely pay the accountants.",
+      "trigger": { "kind": "resource_below", "resourceId": "dinars", "threshold": 5 },
+      "targetCivs": "all",
+      "choices": [
+        {
+          "id": "debase_coinage",
+          "label": "Debase the coinage — mix in copper",
+          "effects": [
+            { "kind": "resource_delta", "resourceId": "dinars", "delta": 20 },
+            { "kind": "stability_delta", "delta": -15 },
+            { "kind": "narrative", "text": "The merchants notice immediately. Everyone notices immediately." }
+          ]
+        },
+        {
+          "id": "emergency_tax",
+          "label": "Emergency tax on grain holdings",
+          "effects": [
+            { "kind": "resource_delta", "resourceId": "dinars", "delta": 15 },
+            { "kind": "resource_delta", "resourceId": "grain", "delta": -10 },
+            { "kind": "stability_delta", "delta": -8 }
+          ]
+        }
+      ],
+      "defaultChoiceId": "debase_coinage",
+      "isRepeatable": true,
+      "weight": 12
+    },
+    {
+      "id": "border-raid",
+      "name": "Border Raid",
+      "description": "With war declared, the frontier becomes a slaughterhouse of small actions and burning villages.",
+      "flavourText": "The border villages are sending refugees. Behind them, smoke.",
+      "trigger": { "kind": "war_declared" },
+      "targetCivs": "all",
+      "choices": [
+        {
+          "id": "fortify",
+          "label": "Fortify the border settlements",
+          "effects": [
+            { "kind": "resource_delta", "resourceId": "soldiers", "delta": -10 },
+            { "kind": "stability_delta", "delta": -5 },
+            { "kind": "narrative", "text": "The raids slow but do not stop." }
+          ]
+        },
+        {
+          "id": "counter_raid",
+          "label": "Launch counter-raids across the border",
+          "effects": [
+            { "kind": "resource_delta", "resourceId": "soldiers", "delta": -15 },
+            { "kind": "resource_delta", "resourceId": "dinars", "delta": 10 },
+            { "kind": "stability_delta", "delta": -3 }
+          ]
+        }
+      ],
+      "defaultChoiceId": "fortify",
+      "isRepeatable": true,
+      "weight": 15
+    },
+    {
+      "id": "poet-arrives",
+      "name": "A Poet Arrives at Court",
+      "description": "A wandering poet of great skill appears at your court, seeking patronage — and offering genius in return.",
+      "flavourText": "He arrived at evening, riding a borrowed mule, and by morning had composed three odes that will outlast any king.",
+      "trigger": { "kind": "turn_range", "minTurn": 2, "maxTurn": 15 },
+      "targetCivs": "random_one",
+      "choices": [
+        {
+          "id": "patron",
+          "label": "Offer generous patronage",
+          "effects": [
+            { "kind": "resource_delta", "resourceId": "faith", "delta": 15 },
+            { "kind": "resource_delta", "resourceId": "dinars", "delta": -10 },
+            { "kind": "stability_delta", "delta": 5 }
+          ]
+        },
+        {
+          "id": "let_travel",
+          "label": "Offer a modest gift and let them travel on",
+          "effects": [
+            { "kind": "resource_delta", "resourceId": "faith", "delta": 5 },
+            { "kind": "resource_delta", "resourceId": "dinars", "delta": 5 }
+          ]
+        }
+      ],
+      "defaultChoiceId": "patron",
+      "isRepeatable": false,
+      "weight": 10
+    },
+    {
+      "id": "trade-fleet-from-the-east",
+      "name": "Trade Fleet from the East",
+      "description": "A fleet of eastern merchants has arrived in your harbors, laden with goods the like of which the peninsula has not seen.",
+      "flavourText": "The harbor smells of spice and the merchants speak in six languages. It is, for a moment, like the world is not ending.",
+      "trigger": { "kind": "turn_range", "minTurn": 3, "maxTurn": 20 },
+      "targetCivs": ["ragosa", "ruenda", "kindath"],
+      "choices": [
+        {
+          "id": "welcome_fleet",
+          "label": "Welcome the fleet with generous terms",
+          "effects": [
+            { "kind": "resource_delta", "resourceId": "trade_goods", "delta": 20 },
+            { "kind": "resource_delta", "resourceId": "dinars", "delta": 15 },
+            { "kind": "stability_delta", "delta": 3 }
+          ]
+        },
+        {
+          "id": "tax_heavily",
+          "label": "Tax the fleet heavily at the harbor",
+          "effects": [
+            { "kind": "resource_delta", "resourceId": "dinars", "delta": 25 },
+            { "kind": "resource_delta", "resourceId": "trade_goods", "delta": 5 }
+          ]
+        }
+      ],
+      "defaultChoiceId": "welcome_fleet",
+      "isRepeatable": false,
+      "weight": 8
+    },
+    {
+      "id": "star-falls",
+      "name": "A Star Falls",
+      "description": "A brilliant light crosses the night sky and falls into the sea. The astronomers argue about what it means.",
+      "flavourText": "The scholars say it is only rock and fire. The priests say it is a message. Both are probably right.",
+      "trigger": { "kind": "tech_completed", "techId": "astronomy" },
+      "targetCivs": "all",
+      "choices": [
+        {
+          "id": "interpret_omen",
+          "label": "Interpret it as a divine omen",
+          "effects": [
+            { "kind": "resource_delta", "resourceId": "faith", "delta": 20 },
+            { "kind": "tension_delta", "axis": "religious_fervor", "delta": 5 }
+          ]
+        },
+        {
+          "id": "study_it",
+          "label": "Study it as a natural phenomenon",
+          "effects": [
+            { "kind": "resource_delta", "resourceId": "faith", "delta": 10 },
+            { "kind": "narrative", "text": "The astronomers record the trajectory, the brightness, the silence after. Knowledge is its own kind of faith." }
+          ]
+        }
+      ],
+      "defaultChoiceId": "interpret_omen",
+      "isRepeatable": false,
+      "weight": 5
+    },
+    {
+      "id": "mercenary-captain",
+      "name": "A Mercenary Captain Offers Service",
+      "description": "A hardened mercenary captain, his company battle-tested and looking for work, has come to your court.",
+      "flavourText": "He is polite. His men are not. His price is fair. His loyalty will last exactly as long as his contract.",
+      "trigger": { "kind": "turn_range", "minTurn": 5, "maxTurn": 20 },
+      "targetCivs": "random_one",
+      "choices": [
+        {
+          "id": "hire",
+          "label": "Hire the company",
+          "effects": [
+            { "kind": "resource_delta", "resourceId": "soldiers", "delta": 20 },
+            { "kind": "resource_delta", "resourceId": "dinars", "delta": -30 }
+          ]
+        },
+        {
+          "id": "decline",
+          "label": "Decline his service",
+          "effects": [
+            { "kind": "narrative", "text": "The captain bows politely and rides to your nearest rival." }
+          ]
+        }
+      ],
+      "defaultChoiceId": "hire",
+      "isRepeatable": false,
+      "weight": 10
+    },
+    {
+      "id": "harvest-festival",
+      "name": "Harvest Festival",
+      "description": "The harvest has come in and the people are celebrating. This is what a kingdom is for.",
+      "flavourText": "For one night, the wars are somewhere else. The fires are for dancing, not burning.",
+      "trigger": { "kind": "turn_range", "minTurn": 1, "maxTurn": 40 },
+      "targetCivs": "all",
+      "choices": [
+        {
+          "id": "celebrate",
+          "label": "Celebrate with the people",
+          "effects": [
+            { "kind": "resource_delta", "resourceId": "grain", "delta": 15 },
+            { "kind": "resource_delta", "resourceId": "faith", "delta": 5 },
+            { "kind": "stability_delta", "delta": 8 }
+          ]
+        }
+      ],
+      "defaultChoiceId": "celebrate",
+      "isRepeatable": true,
+      "weight": 8
+    },
+    {
+      "id": "caravan-arrives",
+      "name": "A Caravan Arrives",
+      "description": "A trading caravan, laden with goods from distant lands, has arrived at your gates.",
+      "flavourText": "The camel drivers will not say where they came from. The goods speak for themselves.",
+      "trigger": { "kind": "turn_range", "minTurn": 2, "maxTurn": 30 },
+      "targetCivs": "random_one",
+      "choices": [
+        {
+          "id": "buy",
+          "label": "Purchase the entire cargo",
+          "effects": [
+            { "kind": "resource_delta", "resourceId": "trade_goods", "delta": 15 },
+            { "kind": "resource_delta", "resourceId": "dinars", "delta": -20 }
+          ]
+        },
+        {
+          "id": "trade",
+          "label": "Trade fairly and send them on with contacts",
+          "effects": [
+            { "kind": "resource_delta", "resourceId": "dinars", "delta": 10 },
+            { "kind": "resource_delta", "resourceId": "trade_goods", "delta": 8 }
+          ]
+        }
+      ],
+      "defaultChoiceId": "trade",
+      "isRepeatable": true,
+      "weight": 12
+    },
+    {
+      "id": "skilled-craftsmen",
+      "name": "Skilled Craftsmen Seek Work",
+      "description": "A guild of master craftsmen — stonemasons, carpenters, ironworkers — is looking for a patron.",
+      "flavourText": "They build things that last. In Al Rassan, this is either a blessing or a taunt.",
+      "trigger": { "kind": "turn_range", "minTurn": 3, "maxTurn": 25 },
+      "targetCivs": "random_one",
+      "choices": [
+        {
+          "id": "employ",
+          "label": "Employ them and set them to work",
+          "effects": [
+            { "kind": "resource_delta", "resourceId": "dinars", "delta": -15 },
+            { "kind": "stability_delta", "delta": 8 },
+            { "kind": "narrative", "text": "The new buildings rise quickly. The city feels, briefly, like a city with a future." }
+          ]
+        },
+        {
+          "id": "let_go",
+          "label": "Send them to a neighboring kingdom",
+          "effects": [
+            { "kind": "narrative", "text": "The craftsmen move on to more welcoming lands. You see their work in an enemy's city a season later." }
+          ]
+        }
+      ],
+      "defaultChoiceId": "employ",
+      "isRepeatable": false,
+      "weight": 8
+    },
+    {
+      "id": "horse-fair",
+      "name": "The Great Horse Fair",
+      "description": "Breeders from across the peninsula have gathered to trade the finest horses in Al Rassan.",
+      "flavourText": "A good horse is worth three soldiers, or so the cavalry commanders say. The cavalry commanders are not wrong.",
+      "trigger": { "kind": "turn_range", "minTurn": 4, "maxTurn": 25 },
+      "targetCivs": ["cartada", "valledo", "ruenda"],
+      "choices": [
+        {
+          "id": "buy_horses",
+          "label": "Purchase the finest available",
+          "effects": [
+            { "kind": "resource_delta", "resourceId": "horses", "delta": 15 },
+            { "kind": "resource_delta", "resourceId": "dinars", "delta": -20 }
+          ]
+        },
+        {
+          "id": "sell_horses",
+          "label": "Sell from your own herd at the fair",
+          "effects": [
+            { "kind": "resource_delta", "resourceId": "horses", "delta": -10 },
+            { "kind": "resource_delta", "resourceId": "dinars", "delta": 20 }
+          ]
+        }
+      ],
+      "defaultChoiceId": "buy_horses",
+      "isRepeatable": true,
+      "weight": 10
+    },
+    {
+      "id": "kindath-persecution",
+      "name": "Persecution of the Kindath",
+      "description": "Rising religious tensions have turned into violence against the Kindath quarter. The silver-robed are not safe.",
+      "flavourText": "They have survived worse than this. They have always survived. So far.",
+      "trigger": { "kind": "tension_above", "axis": "religious_fervor", "threshold": 60 },
+      "targetCivs": ["kindath"],
+      "choices": [
+        {
+          "id": "flee",
+          "label": "Disperse to safer cities",
+          "effects": [
+            { "kind": "stability_delta", "delta": -15 },
+            { "kind": "resource_delta", "resourceId": "dinars", "delta": -10 },
+            { "kind": "narrative", "text": "The Kindath quarter empties. The counting-houses are shuttered. The city is less wealthy for it." }
+          ]
+        },
+        {
+          "id": "resist",
+          "label": "Resist and defend the quarter",
+          "effects": [
+            { "kind": "stability_delta", "delta": -5 },
+            { "kind": "tension_delta", "axis": "religious_fervor", "delta": 5 },
+            { "kind": "narrative", "text": "The court guard holds the streets. The Kindath survive. The city does not forget." }
+          ]
+        }
+      ],
+      "defaultChoiceId": "flee",
+      "isRepeatable": true,
+      "weight": 10
+    },
+    {
+      "id": "call-to-holy-war",
+      "name": "The Call to Holy War",
+      "description": "The clerics are preaching in every cathedral: the time has come to reclaim the peninsula for Jad.",
+      "flavourText": "The sun disk blazes on every banner. The priests have not spoken like this in a generation.",
+      "trigger": { "kind": "tension_above", "axis": "religious_fervor", "threshold": 70 },
+      "targetCivs": ["valledo", "ruenda"],
+      "choices": [
+        {
+          "id": "answer_call",
+          "label": "Answer the call — ride south",
+          "effects": [
+            { "kind": "resource_delta", "resourceId": "faith", "delta": 20 },
+            { "kind": "tension_delta", "axis": "religious_fervor", "delta": 10 },
+            { "kind": "resource_delta", "resourceId": "soldiers", "delta": 10 }
+          ]
+        },
+        {
+          "id": "stay_out",
+          "label": "Stay out of other kingdoms' holy wars",
+          "effects": [
+            { "kind": "stability_delta", "delta": -5 },
+            { "kind": "resource_delta", "resourceId": "faith", "delta": -10 },
+            { "kind": "narrative", "text": "The clerics preach of cowardice. The people begin to wonder if they are right." }
+          ]
+        }
+      ],
+      "defaultChoiceId": "answer_call",
+      "isRepeatable": false,
+      "weight": 8
+    },
+    {
+      "id": "muwardi-preachers-arrive",
+      "name": "Muwardi Preachers Arrive",
+      "description": "Preachers from across the sea have come, calling the Asharite kingdoms to a purer, harder faith.",
+      "flavourText": "They wear plain wool and eat nothing but dates. They look at the libraries and mosques of Al Rassan with undisguised contempt.",
+      "trigger": { "kind": "tension_above", "axis": "religious_fervor", "threshold": 50 },
+      "targetCivs": ["ragosa", "cartada"],
+      "choices": [
+        {
+          "id": "welcome",
+          "label": "Welcome them — their zeal may be useful",
+          "effects": [
+            { "kind": "resource_delta", "resourceId": "faith", "delta": 15 },
+            { "kind": "tension_delta", "axis": "religious_fervor", "delta": 15 },
+            { "kind": "tension_delta", "axis": "muwardi_threat", "delta": 10 }
+          ]
+        },
+        {
+          "id": "expel",
+          "label": "Expel them — their faith is not our faith",
+          "effects": [
+            { "kind": "resource_delta", "resourceId": "faith", "delta": -5 },
+            { "kind": "tension_delta", "axis": "muwardi_threat", "delta": 5 },
+            { "kind": "stability_delta", "delta": 5 }
+          ]
+        }
+      ],
+      "defaultChoiceId": "expel",
+      "isRepeatable": false,
+      "weight": 8
+    },
+    {
+      "id": "holy-relic-discovered",
+      "name": "A Holy Relic Is Discovered",
+      "description": "Workmen digging foundations have unearthed something ancient — a relic the priests insist is sacred.",
+      "flavourText": "Whether it is truly what they say it is, no one can prove. Whether people believe it — that is already decided.",
+      "trigger": { "kind": "turn_range", "minTurn": 5, "maxTurn": 25 },
+      "targetCivs": "random_one",
+      "choices": [
+        {
+          "id": "display",
+          "label": "Display the relic in the great temple",
+          "effects": [
+            { "kind": "resource_delta", "resourceId": "faith", "delta": 25 },
+            { "kind": "stability_delta", "delta": 10 }
+          ]
+        },
+        {
+          "id": "study",
+          "label": "Give it to the scholars to study",
+          "effects": [
+            { "kind": "resource_delta", "resourceId": "faith", "delta": 15 },
+            { "kind": "resource_delta", "resourceId": "dinars", "delta": 10 }
+          ]
+        }
+      ],
+      "defaultChoiceId": "display",
+      "isRepeatable": false,
+      "weight": 6
+    },
+    {
+      "id": "interfaith-marriage",
+      "name": "An Interfaith Marriage Is Proposed",
+      "description": "A noble family proposes a marriage that would cross the boundaries of faith. In Al Rassan, this has happened before.",
+      "flavourText": "In the old days of the Caliphate, such marriages were unremarkable. These are not the old days.",
+      "trigger": { "kind": "turn_range", "minTurn": 6, "maxTurn": 20 },
+      "targetCivs": "all",
+      "choices": [
+        {
+          "id": "allow",
+          "label": "Allow the marriage — family above faith",
+          "effects": [
+            { "kind": "tension_delta", "axis": "religious_fervor", "delta": -10 },
+            { "kind": "stability_delta", "delta": 5 }
+          ]
+        },
+        {
+          "id": "forbid",
+          "label": "Forbid it — faith above all",
+          "effects": [
+            { "kind": "tension_delta", "axis": "religious_fervor", "delta": 5 },
+            { "kind": "resource_delta", "resourceId": "faith", "delta": 10 }
+          ]
+        }
+      ],
+      "defaultChoiceId": "allow",
+      "isRepeatable": false,
+      "weight": 8
+    },
+    {
+      "id": "inquisition",
+      "name": "The Inquisition Begins",
+      "description": "The church hierarchy has begun investigating heresy and apostasy with new vigor.",
+      "flavourText": "The inquisitors are very polite. They write down everything you say.",
+      "trigger": { "kind": "tension_above", "axis": "religious_fervor", "threshold": 65 },
+      "targetCivs": ["valledo", "ruenda"],
+      "choices": [
+        {
+          "id": "support",
+          "label": "Support the inquisition fully",
+          "effects": [
+            { "kind": "resource_delta", "resourceId": "faith", "delta": 20 },
+            { "kind": "stability_delta", "delta": -10 },
+            { "kind": "narrative", "text": "The fires burn bright. The streets are quieter after." }
+          ]
+        },
+        {
+          "id": "moderate",
+          "label": "Moderate its excesses",
+          "effects": [
+            { "kind": "resource_delta", "resourceId": "faith", "delta": 5 },
+            { "kind": "stability_delta", "delta": 5 }
+          ]
+        }
+      ],
+      "defaultChoiceId": "moderate",
+      "isRepeatable": false,
+      "weight": 7
+    },
+    {
+      "id": "muwardis-cross-the-sea",
+      "name": "The Muwardis Cross the Straits",
+      "description": "Ships have been seen crossing the southern straits. The watching parties say they fly Muwardi banners.",
+      "flavourText": "It was always going to happen. The question was only when.",
+      "trigger": { "kind": "turn_range", "minTurn": 8, "maxTurn": 12 },
+      "targetCivs": "all",
+      "choices": [
+        {
+          "id": "heed_warning",
+          "label": "Heed the warning and prepare",
+          "effects": [
+            { "kind": "narrative", "text": "The Muwardis have been seen on the straits. What was rumor is now fact." },
+            { "kind": "tension_delta", "axis": "muwardi_threat", "delta": 15 }
+          ]
+        }
+      ],
+      "defaultChoiceId": "heed_warning",
+      "isRepeatable": false,
+      "weight": 5
+    },
+    {
+      "id": "muwardi-vanguard",
+      "name": "The Muwardi Vanguard",
+      "description": "Advance units of the Muwardi army have been reported in the south. The invasion is no longer a rumor.",
+      "flavourText": "The scouts describe an army that marches in silence and prays five times a day. They do not trade. They do not negotiate.",
+      "trigger": { "kind": "tension_above", "axis": "muwardi_threat", "threshold": 50 },
+      "targetCivs": "all",
+      "choices": [
+        {
+          "id": "prepare",
+          "label": "Mobilize your forces immediately",
+          "effects": [
+            { "kind": "resource_delta", "resourceId": "soldiers", "delta": 10 },
+            { "kind": "resource_delta", "resourceId": "dinars", "delta": -15 },
+            { "kind": "tension_delta", "axis": "muwardi_threat", "delta": 5 }
+          ]
+        },
+        {
+          "id": "ignore",
+          "label": "Ignore it — it is not yet your problem",
+          "effects": [
+            { "kind": "tension_delta", "axis": "muwardi_threat", "delta": 10 }
+          ]
+        }
+      ],
+      "defaultChoiceId": "prepare",
+      "isRepeatable": false,
+      "weight": 5
+    },
+    {
+      "id": "muwardi-army-lands",
+      "name": "The Muwardi Army Lands",
+      "description": "The Muwardi host has crossed the sea in force. They are on the peninsula. The golden age is over.",
+      "flavourText": "From the towers of Silvenes you can see the campfires. There are many campfires.",
+      "trigger": { "kind": "tension_above", "axis": "muwardi_threat", "threshold": 70 },
+      "targetCivs": "all",
+      "choices": [
+        {
+          "id": "defend",
+          "label": "Prepare every defense — this is the war",
+          "effects": [
+            { "kind": "resource_delta", "resourceId": "soldiers", "delta": 20 },
+            { "kind": "resource_delta", "resourceId": "dinars", "delta": -25 },
+            { "kind": "narrative", "text": "The Muwardis have landed in force. The peninsula will never be the same." },
+            { "kind": "spawn_unit", "unitDefinitionId": "levy-spearman", "coord": { "col": 10, "row": 14 } }
+          ]
+        },
+        {
+          "id": "seek_terms",
+          "label": "Send an envoy to seek terms",
+          "effects": [
+            { "kind": "stability_delta", "delta": -20 },
+            { "kind": "resource_delta", "resourceId": "dinars", "delta": 10 },
+            { "kind": "narrative", "text": "The Muwardi commander returns the envoy's head. There are no terms." }
+          ]
+        }
+      ],
+      "defaultChoiceId": "defend",
+      "isRepeatable": false,
+      "weight": 5
+    },
+    {
+      "id": "the-last-battle",
+      "name": "The Last Battle of Al Rassan",
+      "description": "The Muwardi host closes on the last free cities. There will be no more retreats.",
+      "flavourText": "Every army that Al Rassan has ever fielded stands in one plain. Every banner. Every god. Everyone who is left.",
+      "trigger": { "kind": "tension_above", "axis": "muwardi_threat", "threshold": 90 },
+      "targetCivs": "all",
+      "choices": [
+        {
+          "id": "stand_together",
+          "label": "Stand together — all faiths, all swords",
+          "effects": [
+            { "kind": "narrative", "text": "The last armies of Al Rassan gather. Whatever comes next, they face it together." },
+            { "kind": "tension_delta", "axis": "muwardi_threat", "delta": 5 },
+            { "kind": "resource_delta", "resourceId": "faith", "delta": 20 }
+          ]
+        }
+      ],
+      "defaultChoiceId": "stand_together",
+      "isRepeatable": false,
+      "weight": 3
+    },
+    {
+      "id": "the-half-blood",
+      "name": "The Half-Blood",
+      "description": "A figure appears in the story of Al Rassan: someone born between two faiths, belonging to neither, claiming both.",
+      "flavourText": "He was Asharite and Jaddite by blood. He was physician and soldier. He was the kind of person that Al Rassan produces, and that Al Rassan will not be able to produce for much longer.",
+      "trigger": { "kind": "turn_number", "turn": 3 },
+      "targetCivs": "all",
+      "choices": [
+        {
+          "id": "acknowledge",
+          "label": "Mark the moment",
+          "effects": [
+            { "kind": "narrative", "text": "In Al Rassan, the children of three faiths have always walked the same streets. But something is ending." }
+          ]
+        }
+      ],
+      "defaultChoiceId": "acknowledge",
+      "isRepeatable": false,
+      "weight": 5
+    },
+    {
+      "id": "the-three-children-of-jad",
+      "name": "The Three Children of Jad",
+      "description": "The Jaddite priests gather to remind their congregations of their sacred purpose.",
+      "flavourText": "Jad made the sun and set it in the sky to give light to his children. His children have been in the dark too long.",
+      "trigger": { "kind": "turn_number", "turn": 1 },
+      "targetCivs": ["valledo", "ruenda"],
+      "choices": [
+        {
+          "id": "acknowledge",
+          "label": "Hear the sermon",
+          "effects": [
+            { "kind": "resource_delta", "resourceId": "faith", "delta": 10 },
+            { "kind": "narrative", "text": "Jad made the sun and set it in the sky. The kingdom answers with drawn swords." }
+          ]
+        }
+      ],
+      "defaultChoiceId": "acknowledge",
+      "isRepeatable": false,
+      "weight": 5
+    },
+    {
+      "id": "the-night-of-the-god",
+      "name": "The Night of the Two Moons",
+      "description": "The Kindath holy night, when both moons are full. A time of prayer, remembrance, and longing.",
+      "flavourText": "They gather quietly, without announcement. They light their candles and speak the old words. They have been doing this for a thousand years.",
+      "trigger": { "kind": "always" },
+      "targetCivs": ["kindath"],
+      "choices": [
+        {
+          "id": "observe",
+          "label": "Observe the holy night",
+          "effects": [
+            { "kind": "resource_delta", "resourceId": "faith", "delta": 5 },
+            { "kind": "stability_delta", "delta": 3 }
+          ]
+        }
+      ],
+      "defaultChoiceId": "observe",
+      "isRepeatable": true,
+      "weight": 3
+    },
+    {
+      "id": "a-golden-age-ends",
+      "name": "A Golden Age Ends",
+      "description": "The poet-kings have reached their height. The golden age of Al Rassan is complete. And something in the south is stirring.",
+      "flavourText": "The poems will be read for a thousand years. The poets will be dead in twenty.",
+      "trigger": { "kind": "tech_completed", "techId": "poet-kings" },
+      "targetCivs": "all",
+      "choices": [
+        {
+          "id": "mourn",
+          "label": "Accept that the age is ending",
+          "effects": [
+            { "kind": "narrative", "text": "The age of the poet-kings has reached its height. The Muwardis are coming. Al Rassan will not survive unchanged." },
+            { "kind": "tension_delta", "axis": "muwardi_threat", "delta": 20 }
+          ]
+        }
+      ],
+      "defaultChoiceId": "mourn",
+      "isRepeatable": false,
+      "weight": 1
+    },
+    {
+      "id": "the-new-moon-feast",
+      "name": "The New Moon Feast",
+      "description": "The Asharite new moon celebration brings the city together in a brief moment of peace.",
+      "flavourText": "The lanterns are lit in every window. For one night, the fighting is somewhere else.",
+      "trigger": { "kind": "turn_number", "turn": 2 },
+      "targetCivs": ["ragosa", "cartada"],
+      "choices": [
+        {
+          "id": "feast",
+          "label": "Hold a grand feast",
+          "effects": [
+            { "kind": "resource_delta", "resourceId": "dinars", "delta": -5 },
+            { "kind": "stability_delta", "delta": 8 },
+            { "kind": "resource_delta", "resourceId": "faith", "delta": 5 }
+          ]
+        },
+        {
+          "id": "abstain",
+          "label": "Keep the feast simple this year",
+          "effects": [
+            { "kind": "narrative", "text": "The feast passes without grand celebration. The people notice." }
+          ]
+        }
+      ],
+      "defaultChoiceId": "feast",
+      "isRepeatable": false,
+      "weight": 5
+    },
+    {
+      "id": "the-last-caliph",
+      "name": "The Last Caliph Is Dead",
+      "description": "The last Caliph of the old order has died in Qurtaba, unmourned by some and sincerely mourned by others.",
+      "flavourText": "He was not a great man. But he was the last of a kind of man. With him dies the idea that Al Rassan was one thing.",
+      "trigger": { "kind": "turn_number", "turn": 5 },
+      "targetCivs": "all",
+      "choices": [
+        {
+          "id": "acknowledge",
+          "label": "Note the passing of an age",
+          "effects": [
+            { "kind": "narrative", "text": "The last Caliph has died in Qurtaba. Al Rassan is now a land of fragments, and everyone knows it." },
+            { "kind": "tension_delta", "axis": "muwardi_threat", "delta": 5 }
+          ]
+        }
+      ],
+      "defaultChoiceId": "acknowledge",
+      "isRepeatable": false,
+      "weight": 5
+    },
+    {
+      "id": "whispers-of-war",
+      "name": "Whispers of War",
+      "description": "The souks are full of rumors. The ambassadors are sending coded messages. War is being discussed.",
+      "flavourText": "Whispers travel faster than armies. By the time the armies move, everyone already knows what they will do.",
+      "trigger": { "kind": "turn_number", "turn": 4 },
+      "targetCivs": "all",
+      "choices": [
+        {
+          "id": "listen",
+          "label": "Listen carefully and prepare",
+          "effects": [
+            { "kind": "tension_delta", "axis": "religious_fervor", "delta": 5 },
+            { "kind": "narrative", "text": "Whispers of war spread through the souks and cathedrals alike. No one is surprised." }
+          ]
+        },
+        {
+          "id": "dismiss",
+          "label": "Dismiss the rumors publicly",
+          "effects": [
+            { "kind": "stability_delta", "delta": 3 },
+            { "kind": "narrative", "text": "You dismiss the rumors. Some people believe you." }
+          ]
+        }
+      ],
+      "defaultChoiceId": "listen",
+      "isRepeatable": false,
+      "weight": 5
+    },
+    {
+      "id": "the-silver-road",
+      "name": "The Silver Road",
+      "description": "The ancient Kindath trade network activates, bringing unusual wealth to those connected to it.",
+      "flavourText": "Silver moves where armies cannot follow. This has always been the Kindath gift.",
+      "trigger": { "kind": "turn_number", "turn": 6 },
+      "targetCivs": ["kindath", "ragosa"],
+      "choices": [
+        {
+          "id": "trade",
+          "label": "Invest in the silver road",
+          "effects": [
+            { "kind": "resource_delta", "resourceId": "dinars", "delta": 20 },
+            { "kind": "resource_delta", "resourceId": "trade_goods", "delta": 10 }
+          ]
+        },
+        {
+          "id": "secure",
+          "label": "Secure the road with soldiers",
+          "effects": [
+            { "kind": "resource_delta", "resourceId": "dinars", "delta": 10 },
+            { "kind": "resource_delta", "resourceId": "soldiers", "delta": 5 }
+          ]
+        }
+      ],
+      "defaultChoiceId": "trade",
+      "isRepeatable": false,
+      "weight": 5
+    },
+    {
+      "id": "siege-and-counter",
+      "name": "Siege and Counter-Siege",
+      "description": "Cities are invested and relieved, walls are manned and breached. War has its own terrible logic.",
+      "flavourText": "The besiegers dig their trenches. The besieged count their grain. Both sides pray for relief.",
+      "trigger": { "kind": "war_declared" },
+      "targetCivs": "all",
+      "choices": [
+        {
+          "id": "fortify",
+          "label": "Reinforce your walls",
+          "effects": [
+            { "kind": "resource_delta", "resourceId": "soldiers", "delta": -5 },
+            { "kind": "stability_delta", "delta": -5 },
+            { "kind": "narrative", "text": "The walls are manned. The siege settles into its grim arithmetic." }
+          ]
+        }
+      ],
+      "defaultChoiceId": "fortify",
+      "isRepeatable": true,
+      "weight": 8
+    },
+    {
+      "id": "scorched-earth",
+      "name": "Scorched Earth",
+      "description": "As armies cross the border, the fields burn. It is not clear which side is burning them.",
+      "flavourText": "The granaries are torched before the army retreats. Hungry soldiers are bad soldiers. Hungry civilians are worse.",
+      "trigger": { "kind": "war_declared" },
+      "targetCivs": "all",
+      "choices": [
+        {
+          "id": "implement",
+          "label": "Implement a scorched-earth retreat",
+          "effects": [
+            { "kind": "resource_delta", "resourceId": "grain", "delta": -15 },
+            { "kind": "stability_delta", "delta": -10 },
+            { "kind": "narrative", "text": "The fields are burned. The enemy advances through ash." }
+          ]
+        },
+        {
+          "id": "refuse",
+          "label": "Refuse — the people need those fields",
+          "effects": [
+            { "kind": "narrative", "text": "The fields stand. The enemy feeds themselves on your harvest." }
+          ]
+        }
+      ],
+      "defaultChoiceId": "refuse",
+      "isRepeatable": true,
+      "weight": 7
+    },
+    {
+      "id": "desert-caravans",
+      "name": "Desert Caravans of the South",
+      "description": "Routes through the desert bring exotic goods from sub-Saharan trading kingdoms.",
+      "flavourText": "The camel drivers know routes that no map records. They have always known them.",
+      "trigger": { "kind": "turn_range", "minTurn": 3, "maxTurn": 30 },
+      "targetCivs": ["cartada"],
+      "choices": [
+        {
+          "id": "fund",
+          "label": "Fund the caravan routes",
+          "effects": [
+            { "kind": "resource_delta", "resourceId": "dinars", "delta": -10 },
+            { "kind": "resource_delta", "resourceId": "trade_goods", "delta": 20 }
+          ]
+        },
+        {
+          "id": "ignore",
+          "label": "Let them find their own way",
+          "effects": [
+            { "kind": "narrative", "text": "The caravans pass without stopping. Cartada is not the destination today." }
+          ]
+        }
+      ],
+      "defaultChoiceId": "fund",
+      "isRepeatable": true,
+      "weight": 8
+    },
+    {
+      "id": "mountain-pass-opens",
+      "name": "A Mountain Pass Opens",
+      "description": "Spring thaw has opened a mountain pass that was believed impassable. Armies take note.",
+      "flavourText": "The scouts return with snow still on their boots and a new route drawn in charcoal.",
+      "trigger": { "kind": "turn_range", "minTurn": 5, "maxTurn": 25 },
+      "targetCivs": "all",
+      "choices": [
+        {
+          "id": "secure",
+          "label": "Secure the pass with a garrison",
+          "effects": [
+            { "kind": "resource_delta", "resourceId": "soldiers", "delta": -5 },
+            { "kind": "stability_delta", "delta": 5 },
+            { "kind": "narrative", "text": "The pass is garrisoned. A new strategic option opens." }
+          ]
+        },
+        {
+          "id": "ignore",
+          "label": "Leave it unguarded",
+          "effects": [
+            { "kind": "narrative", "text": "The pass remains unguarded. Others may find it useful." }
+          ]
+        }
+      ],
+      "defaultChoiceId": "secure",
+      "isRepeatable": false,
+      "weight": 6
+    },
+    {
+      "id": "the-wandering-scholar",
+      "name": "The Wandering Scholar",
+      "description": "A scholar of great learning, who has studied in three kingdoms, seeks a final home.",
+      "flavourText": "He has read everything written in Al Rassan in the last three generations. He carries it in his head, and it is heavy.",
+      "trigger": { "kind": "turn_range", "minTurn": 4, "maxTurn": 20 },
+      "targetCivs": "random_one",
+      "choices": [
+        {
+          "id": "host",
+          "label": "Offer the scholar a permanent home",
+          "effects": [
+            { "kind": "resource_delta", "resourceId": "faith", "delta": 10 },
+            { "kind": "resource_delta", "resourceId": "dinars", "delta": -10 },
+            { "kind": "narrative", "text": "The scholar arrives with three carts of books and immediately begins teaching. The city is richer for it." }
+          ]
+        },
+        {
+          "id": "ignore",
+          "label": "Send him elsewhere",
+          "effects": [
+            { "kind": "narrative", "text": "The scholar moves on. You hear later that he settled in a rival's city." }
+          ]
+        }
+      ],
+      "defaultChoiceId": "host",
+      "isRepeatable": false,
+      "weight": 8
+    },
+    {
+      "id": "blood-debt",
+      "name": "Blood Debt",
+      "description": "In Al Rassan, blood spilled does not dry quickly. Every war creates feuds that outlast the peace.",
+      "flavourText": "They remember who burned the village. They will remember for three generations.",
+      "trigger": { "kind": "war_declared" },
+      "targetCivs": "all",
+      "choices": [
+        {
+          "id": "remember",
+          "label": "Remember and record every death",
+          "effects": [
+            { "kind": "tension_delta", "axis": "religious_fervor", "delta": 8 },
+            { "kind": "narrative", "text": "Blood spilled in Al Rassan does not dry quickly. The ledgers are kept." }
+          ]
+        }
+      ],
+      "defaultChoiceId": "remember",
+      "isRepeatable": true,
+      "weight": 10
+    }
+  ],
+  "diplomacyOptions": [
+    {
+      "actionType": "propose_peace",
+      "allowedStates": ["war"],
+      "description": "Offer peace terms to end the current state of war"
+    },
+    {
+      "actionType": "propose_alliance",
+      "allowedStates": ["peace", "truce"],
+      "description": "Propose a formal alliance for mutual military and economic benefit"
+    },
+    {
+      "actionType": "declare_war",
+      "allowedStates": ["peace", "truce", "vassal"],
+      "description": "Declare open war and begin hostilities"
+    },
+    {
+      "actionType": "propose_truce",
+      "allowedStates": ["war"],
+      "description": "Propose a temporary cessation of hostilities"
+    },
+    {
+      "actionType": "propose_vassalage",
+      "allowedStates": ["peace"],
+      "description": "Offer to become a vassal state in exchange for protection"
+    },
+    {
+      "actionType": "send_message",
+      "allowedStates": ["peace", "alliance", "war", "truce", "vassal"],
+      "description": "Send a diplomatic message to another ruler"
+    },
+    {
+      "actionType": "offer_trade",
+      "allowedStates": ["peace", "alliance"],
+      "description": "Propose a trade agreement for mutual economic benefit"
+    },
+    {
+      "actionType": "break_alliance",
+      "allowedStates": ["alliance"],
+      "description": "Unilaterally dissolve an existing alliance"
+    }
+  ],
+  "victoryConditions": [
+    { "kind": "eliminate_all" },
+    { "kind": "control_hexes", "count": 80 },
+    { "kind": "resource_accumulate", "resourceId": "faith", "amount": 500 }
+  ],
+  "defeatConditions": [
+    { "kind": "capital_lost" },
+    { "kind": "stability_zero", "turnsAtZero": 2 },
+    { "kind": "eliminated_by_combat" }
+  ],
+  "mechanics": {
+    "tensionAxes": [
+      {
+        "id": "religious_fervor",
+        "name": "Religious Fervor",
+        "description": "Rises with religious techs and war between faiths. High values give combat bonuses vs the opposing religion but trigger persecution events and diplomatic penalties.",
+        "minValue": 0,
+        "maxValue": 100
+      },
+      {
+        "id": "muwardi_threat",
+        "name": "The Muwardi Threat",
+        "description": "A global shadow rising over Al Rassan. Increases with each passing season, faster if the Asharite kingdoms fragment or fall. Above 70, the invasion chain begins.",
+        "minValue": 0,
+        "maxValue": 100
+      }
+    ],
+    "combatModifiers": {
+      "mountains": 0.8,
+      "forest": 0.9,
+      "desert": 0.85,
+      "coast": 0.95,
+      "plains": 1.0,
+      "river": 0.9,
+      "sea": 1.0
+    },
+    "resourceInteractions": [
+      { "sourceId": "grain", "targetId": "soldiers", "multiplier": 0.1 },
+      { "sourceId": "horses", "targetId": "soldiers", "multiplier": 0.05 },
+      { "sourceId": "trade_goods", "targetId": "dinars", "multiplier": 0.2 },
+      { "sourceId": "faith", "targetId": "soldiers", "multiplier": 0.05 }
+    ],
+    "turnCycleLength": 4,
+    "turnCycleNames": ["spring", "summer", "autumn", "winter"],
+    "turnCycleEffects": [
+      {
+        "phase": "spring",
+        "resourceModifiers": { "grain": 1.2, "horses": 1.1 },
+        "combatModifier": 0,
+        "stabilityModifier": 3
+      },
+      {
+        "phase": "summer",
+        "resourceModifiers": { "soldiers": 1.1, "dinars": 1.1 },
+        "combatModifier": 5,
+        "stabilityModifier": 0
+      },
+      {
+        "phase": "autumn",
+        "resourceModifiers": { "grain": 1.3, "trade_goods": 1.15 },
+        "combatModifier": 0,
+        "stabilityModifier": 2
+      },
+      {
+        "phase": "winter",
+        "resourceModifiers": { "grain": 0.75, "soldiers": 0.9 },
+        "combatModifier": -5,
+        "stabilityModifier": -5
+      }
+    ]
+  },
+  "flavor": {
+    "turnName": "Season",
+    "currencyName": "Dinars",
+    "eraNames": ["The Fragile Peace", "The Unraveling", "The Last Light"],
+    "settingDescription": "Al Rassan glitters at the southern edge of the known world: a peninsula of cities, scholars, poets, and soldiers where three faiths circle one another in uneasy coexistence. To the north, the Jaddite kingdoms of Valledo and Ruenda hold the mountain passes and dream of reconquest. In the warm south, the Asharite Kingdoms of Cartada and Ragosa thrive in wealth and culture — but the old Caliphate at Qurtaba has crumbled, and the lions grow hungry. Between all of them move the silver-robed Kindath, merchants and physicians and astronomers, tolerated everywhere and safe nowhere. Yet the age of tolerance is ending. From across the sea, the Muwardi fundamentalists watch and wait. Their holy war has not yet come — but everyone who can read the stars knows it will. This is the last golden age, and it is already ending."
+  }
+}

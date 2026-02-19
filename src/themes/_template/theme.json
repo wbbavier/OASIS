@@ -8,6 +8,8 @@
   "map": {},
   "resources": [],
   "techTree": [],
+  "buildings": [],
+  "units": [],
   "events": [],
   "diplomacyOptions": [],
   "victoryConditions": [],
@@ -16,6 +18,7 @@
   "flavor": {
     "turnName": "Turn",
     "currencyName": "Gold",
-    "eraNames": []
+    "eraNames": [],
+    "settingDescription": ""
   }
 }
