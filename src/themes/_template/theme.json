@@ -1,0 +1,21 @@
+{
+  "_comment": "Blank theme template — copy and fill in for a new game universe.",
+  "id": "template",
+  "name": "Template Theme",
+  "description": "Replace with your theme description.",
+  "source": "",
+  "civilizations": [],
+  "map": {},
+  "resources": [],
+  "techTree": [],
+  "events": [],
+  "diplomacyOptions": [],
+  "victoryConditions": [],
+  "defeatConditions": [],
+  "mechanics": {},
+  "flavor": {
+    "turnName": "Turn",
+    "currencyName": "Gold",
+    "eraNames": []
+  }
+}
