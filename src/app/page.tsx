@@ -1,62 +1,153 @@
-import { supabase } from "@/lib/supabase";
+'use client';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { useAuth } from '@/lib/hooks/useAuth';
+import { supabase } from '@/lib/supabase';
+import { GameList } from '@/components/lobby/GameList';
+import { Button } from '@/components/ui/Button';
+import { Spinner } from '@/components/ui/Spinner';
 
-async function checkDatabaseConnection(): Promise<{
-  ok: boolean;
-  message: string;
-}> {
-  try {
-    // A minimal round-trip: fetch the server timestamp.
-    // This works on any Supabase project without requiring any tables.
-    const { error } = await supabase.rpc("now" as never);
-
-    // Supabase returns a "function not found" error for `now()` called via rpc,
-    // but the HTTP round-trip itself succeeds — which is all we need to confirm
-    // the project URL and anon key are valid. A network/auth failure throws instead.
-    if (error && error.code === "PGRST202") {
-      // Function not found is expected — connection is alive
-      return { ok: true, message: "Database reachable" };
-    }
-    if (error) {
-      return { ok: false, message: error.message };
-    }
-    return { ok: true, message: "Database reachable" };
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Unknown error";
-    return { ok: false, message };
-  }
+interface GameRow {
+  id: string;
+  name: string;
+  theme_id: string;
+  phase: string;
+  playerCount: number;
 }
 
-export default async function HomePage() {
-  const db = await checkDatabaseConnection();
+export default function HomePage() {
+  const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
+  const [games, setGames] = useState<GameRow[]>([]);
+  const [gamesLoading, setGamesLoading] = useState(true);
+  const [gamesError, setGamesError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.replace('/auth');
+    }
+  }, [authLoading, user, router]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    async function loadGames() {
+      setGamesLoading(true);
+      setGamesError(null);
+
+      // Fetch games the current user is a member of
+      const { data: playerRows, error: playerError } = await supabase
+        .from('game_players')
+        .select('game_id')
+        .eq('player_id', user!.id);
+
+      if (playerError) {
+        setGamesError(playerError.message);
+        setGamesLoading(false);
+        return;
+      }
+
+      const gameIds = (playerRows ?? []).map((r: { game_id: string }) => r.game_id);
+
+      if (gameIds.length === 0) {
+        setGames([]);
+        setGamesLoading(false);
+        return;
+      }
+
+      const { data: gameRows, error: gamesError } = await supabase
+        .from('games')
+        .select('id, name, theme_id, phase')
+        .in('id', gameIds)
+        .order('created_at', { ascending: false });
+
+      if (gamesError) {
+        setGamesError(gamesError.message);
+        setGamesLoading(false);
+        return;
+      }
+
+      // Fetch player counts for each game
+      const { data: countRows, error: countError } = await supabase
+        .from('game_players')
+        .select('game_id')
+        .in('game_id', gameIds);
+
+      if (countError) {
+        setGamesError(countError.message);
+        setGamesLoading(false);
+        return;
+      }
+
+      const countMap = new Map<string, number>();
+      for (const row of countRows ?? []) {
+        countMap.set(row.game_id, (countMap.get(row.game_id) ?? 0) + 1);
+      }
+
+      setGames(
+        (gameRows ?? []).map(
+          (g: { id: string; name: string; theme_id: string; phase: string }) => ({
+            id: g.id,
+            name: g.name,
+            theme_id: g.theme_id,
+            phase: g.phase,
+            playerCount: countMap.get(g.id) ?? 0,
+          })
+        )
+      );
+      setGamesLoading(false);
+    }
+
+    loadGames();
+  }, [user]);
+
+  if (authLoading) {
+    return (
+      <main className="flex min-h-screen items-center justify-center">
+        <Spinner size={32} className="text-indigo-400" />
+      </main>
+    );
+  }
+
+  if (!user) return null;
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-8 p-8">
-      <div className="text-center">
-        <h1 className="text-5xl font-bold tracking-tight text-stone-100">
-          OASIS
-        </h1>
-        <p className="mt-2 text-stone-400 text-lg">
-          A weekly turn-based civilization simulation
-        </p>
-      </div>
-
-      <div
-        className={`flex items-center gap-3 rounded-lg border px-6 py-4 ${
-          db.ok
-            ? "border-emerald-700 bg-emerald-950 text-emerald-300"
-            : "border-red-700 bg-red-950 text-red-300"
-        }`}
-      >
-        <span className="text-xl">{db.ok ? "✓" : "✗"}</span>
+    <main className="mx-auto flex min-h-screen max-w-2xl flex-col gap-8 p-8">
+      <div className="flex items-center justify-between">
         <div>
-          <p className="font-semibold">
-            {db.ok ? "Database connected" : "Database error"}
-          </p>
-          <p className="text-sm opacity-75">{db.message}</p>
+          <h1 className="text-3xl font-bold tracking-tight text-stone-100">OASIS</h1>
+          <p className="text-stone-400 text-sm">{user.email}</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <Link href="/create">
+            <Button size="sm">Create game</Button>
+          </Link>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={async () => {
+              await supabase.auth.signOut();
+              router.replace('/auth');
+            }}
+          >
+            Sign out
+          </Button>
         </div>
       </div>
 
-      <p className="text-stone-600 text-sm">Phase 0 skeleton — {new Date().toISOString().split("T")[0]}</p>
+      <section>
+        <h2 className="mb-4 text-lg font-semibold text-stone-200">Your games</h2>
+        {gamesLoading ? (
+          <div className="flex justify-center py-12">
+            <Spinner size={28} className="text-stone-500" />
+          </div>
+        ) : gamesError ? (
+          <p className="text-sm text-red-400">{gamesError}</p>
+        ) : (
+          <GameList games={games} />
+        )}
+      </section>
     </main>
   );
 }
