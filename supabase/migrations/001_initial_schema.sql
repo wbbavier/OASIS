@@ -96,16 +96,9 @@ CREATE TABLE IF NOT EXISTS public.game_players (
 
 ALTER TABLE public.game_players ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "game_players_select_members"
-  ON public.game_players FOR SELECT
-  TO authenticated
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.game_players gp2
-      WHERE gp2.game_id = game_players.game_id
-        AND gp2.player_id = auth.uid()
-    )
-  );
+-- Note: no select policy here — 002_join_policy.sql adds
+-- game_players_select_authenticated (USING true) which avoids the
+-- infinite recursion that a self-referencing subquery would cause.
 
 CREATE POLICY "game_players_insert_self"
   ON public.game_players FOR INSERT
