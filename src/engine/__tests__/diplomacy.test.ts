@@ -116,7 +116,22 @@ describe('resolveDiplomacy — declare_war', () => {
 });
 
 describe('resolveDiplomacy — propose_peace', () => {
-  it('sets both civs to peace (symmetric)', () => {
+  it('sets both civs to peace when both propose (mutual)', () => {
+    const state = makeState({
+      'civ-a': makeCiv('civ-a', { 'civ-b': 'war' }),
+      'civ-b': makeCiv('civ-b', { 'civ-a': 'war' }),
+    });
+    const orders = [
+      makeOrders('civ-a', 'propose_peace', 'civ-b'),
+      makeOrders('civ-b', 'propose_peace', 'civ-a'),
+    ];
+    const result = resolveDiplomacy(state, orders, MINIMAL_THEME);
+
+    expect(result.civilizations['civ-a'].diplomaticRelations['civ-b']).toBe('peace');
+    expect(result.civilizations['civ-b'].diplomaticRelations['civ-a']).toBe('peace');
+  });
+
+  it('does not change state when only one side proposes peace', () => {
     const state = makeState({
       'civ-a': makeCiv('civ-a', { 'civ-b': 'war' }),
       'civ-b': makeCiv('civ-b', { 'civ-a': 'war' }),
@@ -124,13 +139,28 @@ describe('resolveDiplomacy — propose_peace', () => {
     const orders = [makeOrders('civ-a', 'propose_peace', 'civ-b')];
     const result = resolveDiplomacy(state, orders, MINIMAL_THEME);
 
-    expect(result.civilizations['civ-a'].diplomaticRelations['civ-b']).toBe('peace');
-    expect(result.civilizations['civ-b'].diplomaticRelations['civ-a']).toBe('peace');
+    expect(result.civilizations['civ-a'].diplomaticRelations['civ-b']).toBe('war');
+    expect(result.civilizations['civ-b'].diplomaticRelations['civ-a']).toBe('war');
   });
 });
 
 describe('resolveDiplomacy — propose_alliance', () => {
-  it('sets both civs to alliance (symmetric)', () => {
+  it('sets both civs to alliance when both propose (mutual)', () => {
+    const state = makeState({
+      'civ-a': makeCiv('civ-a', { 'civ-b': 'peace' }),
+      'civ-b': makeCiv('civ-b', { 'civ-a': 'peace' }),
+    });
+    const orders = [
+      makeOrders('civ-a', 'propose_alliance', 'civ-b'),
+      makeOrders('civ-b', 'propose_alliance', 'civ-a'),
+    ];
+    const result = resolveDiplomacy(state, orders, MINIMAL_THEME);
+
+    expect(result.civilizations['civ-a'].diplomaticRelations['civ-b']).toBe('alliance');
+    expect(result.civilizations['civ-b'].diplomaticRelations['civ-a']).toBe('alliance');
+  });
+
+  it('does not change state when only one side proposes alliance', () => {
     const state = makeState({
       'civ-a': makeCiv('civ-a', { 'civ-b': 'peace' }),
       'civ-b': makeCiv('civ-b', { 'civ-a': 'peace' }),
@@ -138,8 +168,8 @@ describe('resolveDiplomacy — propose_alliance', () => {
     const orders = [makeOrders('civ-a', 'propose_alliance', 'civ-b')];
     const result = resolveDiplomacy(state, orders, MINIMAL_THEME);
 
-    expect(result.civilizations['civ-a'].diplomaticRelations['civ-b']).toBe('alliance');
-    expect(result.civilizations['civ-b'].diplomaticRelations['civ-a']).toBe('alliance');
+    expect(result.civilizations['civ-a'].diplomaticRelations['civ-b']).toBe('peace');
+    expect(result.civilizations['civ-b'].diplomaticRelations['civ-a']).toBe('peace');
   });
 });
 
@@ -158,12 +188,15 @@ describe('resolveDiplomacy — break_alliance', () => {
 });
 
 describe('resolveDiplomacy — propose_truce', () => {
-  it('sets both civs to truce (symmetric)', () => {
+  it('sets both civs to truce when both propose (mutual)', () => {
     const state = makeState({
       'civ-a': makeCiv('civ-a', { 'civ-b': 'war' }),
       'civ-b': makeCiv('civ-b', { 'civ-a': 'war' }),
     });
-    const orders = [makeOrders('civ-a', 'propose_truce', 'civ-b')];
+    const orders = [
+      makeOrders('civ-a', 'propose_truce', 'civ-b'),
+      makeOrders('civ-b', 'propose_truce', 'civ-a'),
+    ];
     const result = resolveDiplomacy(state, orders, MINIMAL_THEME);
 
     expect(result.civilizations['civ-a'].diplomaticRelations['civ-b']).toBe('truce');
@@ -248,23 +281,24 @@ describe('resolveDiplomacy — edge cases', () => {
     expect(result.civilizations['civ-b'].diplomaticRelations['civ-a']).toBe('war');
   });
 
-  it('multiple diplomatic actions from different civs processed in order', () => {
+  it('war declarations process before mutual proposals', () => {
+    // civ-a and civ-b already allied, civ-c declares war on civ-b
     const state = makeState({
-      'civ-a': makeCiv('civ-a', { 'civ-b': 'peace' }),
-      'civ-b': makeCiv('civ-b', { 'civ-a': 'peace', 'civ-c': 'peace' }),
+      'civ-a': makeCiv('civ-a', { 'civ-b': 'alliance' }),
+      'civ-b': makeCiv('civ-b', { 'civ-a': 'alliance', 'civ-c': 'peace' }),
       'civ-c': makeCiv('civ-c', { 'civ-b': 'peace' }),
     });
     const orders: PlayerOrders[] = [
-      makeOrders('civ-a', 'propose_alliance', 'civ-b'),
       makeOrders('civ-c', 'declare_war', 'civ-b'),
     ];
     const result = resolveDiplomacy(state, orders, MINIMAL_THEME);
 
-    // civ-a and civ-b should be in alliance (processed first)
-    expect(result.civilizations['civ-a'].diplomaticRelations['civ-b']).toBe('alliance');
-    // civ-c declared war on civ-b; cascade hits civ-a (now allied with civ-b)
+    // civ-c declared war on civ-b
     expect(result.civilizations['civ-c'].diplomaticRelations['civ-b']).toBe('war');
+    // cascade: civ-a is allied with civ-b, so civ-c is also at war with civ-a
     expect(result.civilizations['civ-c'].diplomaticRelations['civ-a']).toBe('war');
+    // civ-a and civ-b remain allied
+    expect(result.civilizations['civ-a'].diplomaticRelations['civ-b']).toBe('alliance');
   });
 
   it('returns a new state object (pure function)', () => {

@@ -146,45 +146,45 @@ function makeGameState(
 describe('calculateEffectivePower', () => {
   it('returns 0 for an empty unit list', () => {
     const theme = makeTheme();
-    expect(calculateEffectivePower([], 'plains', false, theme)).toBe(0);
-    expect(calculateEffectivePower([], 'plains', true, theme)).toBe(0);
+    expect(calculateEffectivePower([], 'plains', false, theme, 0, 0, 0)).toBe(0);
+    expect(calculateEffectivePower([], 'plains', true, theme, 0, 0, 0)).toBe(0);
   });
 
   it('returns total strength on plains for attacker (modifier 1.0)', () => {
     const theme = makeTheme();
     const units = [makeUnit('u1', 'a', 5), makeUnit('u2', 'a', 3)];
-    expect(calculateEffectivePower(units, 'plains', false, theme)).toBe(8);
+    expect(calculateEffectivePower(units, 'plains', false, theme, 0, 0, 0)).toBe(8);
   });
 
   it('applies terrain modifier to attacker on mountains (0.8)', () => {
     const theme = makeTheme();
     const units = [makeUnit('u1', 'a', 10)];
-    expect(calculateEffectivePower(units, 'mountains', false, theme)).toBe(8);
+    expect(calculateEffectivePower(units, 'mountains', false, theme, 0, 0, 0)).toBe(8);
   });
 
   it('applies terrain modifier to attacker on forest (0.9)', () => {
     const theme = makeTheme();
     const units = [makeUnit('u1', 'a', 10)];
-    expect(calculateEffectivePower(units, 'forest', false, theme)).toBeCloseTo(9);
+    expect(calculateEffectivePower(units, 'forest', false, theme, 0, 0, 0)).toBeCloseTo(9);
   });
 
   it('does not apply terrain modifier to defender', () => {
     const theme = makeTheme();
     const units = [makeUnit('u1', 'a', 10)];
     // Defender gets full strength even in mountains
-    expect(calculateEffectivePower(units, 'mountains', true, theme)).toBe(10);
+    expect(calculateEffectivePower(units, 'mountains', true, theme, 0, 0, 0)).toBe(10);
   });
 
-  it('applies garrison bonus 1.25× to defender with garrisoned unit', () => {
+  it('applies garrison bonus 1.25x to defender with garrisoned unit', () => {
     const theme = makeTheme();
     const units = [makeUnit('u1', 'a', 10, 5, true)]; // isGarrisoned = true
-    expect(calculateEffectivePower(units, 'plains', true, theme)).toBe(12.5);
+    expect(calculateEffectivePower(units, 'plains', true, theme, 0, 0, 0)).toBe(12.5);
   });
 
   it('does not apply garrison bonus when no unit is garrisoned', () => {
     const theme = makeTheme();
     const units = [makeUnit('u1', 'a', 10, 5, false)];
-    expect(calculateEffectivePower(units, 'plains', true, theme)).toBe(10);
+    expect(calculateEffectivePower(units, 'plains', true, theme, 0, 0, 0)).toBe(10);
   });
 
   it('applies garrison bonus when at least one unit is garrisoned', () => {
@@ -194,15 +194,20 @@ describe('calculateEffectivePower', () => {
       makeUnit('u2', 'a', 5, 5, false), // not garrisoned
     ];
     // Total strength 10; garrison bonus applies because one is garrisoned
-    expect(calculateEffectivePower(units, 'plains', true, theme)).toBe(12.5);
+    expect(calculateEffectivePower(units, 'plains', true, theme, 0, 0, 0)).toBe(12.5);
   });
 
   it('falls back to 1.0 terrain mod for unknown terrain', () => {
     const theme = makeTheme();
-    // 'lava' is not in combatModifiers
     const units = [makeUnit('u1', 'a', 8)];
-    // Should not throw; defaults to 1.0
-    expect(calculateEffectivePower(units, 'desert', false, theme)).toBeCloseTo(6.8);
+    expect(calculateEffectivePower(units, 'desert', false, theme, 0, 0, 0)).toBeCloseTo(6.8);
+  });
+
+  it('adds tech bonus, seasonal mod, and civ ability bonus', () => {
+    const theme = makeTheme();
+    const units = [makeUnit('u1', 'a', 10)];
+    // Base power = 10 * 1.0 (plains) = 10, plus techBonus=2, seasonalMod=1, civAbility=3
+    expect(calculateEffectivePower(units, 'plains', false, theme, 2, 1, 3)).toBe(16);
   });
 });
 
@@ -231,7 +236,7 @@ describe('applyDamageToUnits', () => {
       makeUnit('u2', 'a', 2, 5), // weakest
     ];
     const result = applyDamageToUnits(units, 2);
-    // u2 (str=2) takes all 2 damage → strength=0, destroyed
+    // u2 (str=2) takes all 2 damage -> strength=0, destroyed
     // u1 (str=5) untouched
     expect(result).toHaveLength(1);
     expect(result[0].id).toBe('u1');
@@ -248,7 +253,7 @@ describe('applyDamageToUnits', () => {
 
   it('destroys a unit when morale reaches 0 (morale collapse)', () => {
     const units = [makeUnit('u1', 'a', 10, 1)]; // morale = 1
-    const result = applyDamageToUnits(units, 1); // takes 1 damage → morale drops to 0
+    const result = applyDamageToUnits(units, 1); // takes 1 damage -> morale drops to 0
     expect(result).toHaveLength(0); // destroyed by morale collapse
   });
 
@@ -286,12 +291,13 @@ describe('resolveCombatEncounter', () => {
       attackerUnits: [makeUnit('u1', 'a', 100)],
       defenderUnits: [makeUnit('u2', 'b', 1)],
     };
-    const outcome = resolveCombatEncounter(encounter, theme, createPRNG(42));
+    const state = makeGameState([[]], { a: makeCiv('a'), b: makeCiv('b') });
+    const outcome = resolveCombatEncounter(encounter, state, theme, createPRNG(42));
     expect(outcome.result.outcome).toBe('attacker_wins');
-    // Defender is routed: all 1 strength point lost
+    // Defender loses 60% of 1 = max(1,0) = 1
     expect(outcome.result.defenderStrengthLost).toBe(1);
-    // Attacker takes token casualties (10% of 100 = 10, min 1)
-    expect(outcome.result.attackerStrengthLost).toBe(10);
+    // Attacker loses 15% of 100 = 15
+    expect(outcome.result.attackerStrengthLost).toBe(15);
     // Defender has no survivors
     expect(outcome.defenderUnitsAfter).toHaveLength(0);
   });
@@ -306,8 +312,10 @@ describe('resolveCombatEncounter', () => {
       attackerUnits: [makeUnit('u1', 'a', 1)],
       defenderUnits: [makeUnit('u2', 'b', 100)],
     };
-    const outcome = resolveCombatEncounter(encounter, theme, createPRNG(42));
+    const state = makeGameState([[]], { a: makeCiv('a'), b: makeCiv('b') });
+    const outcome = resolveCombatEncounter(encounter, state, theme, createPRNG(42));
     expect(outcome.result.outcome).toBe('defender_wins');
+    // Attacker loses 60% of 1 = 1
     expect(outcome.result.attackerStrengthLost).toBe(1);
     expect(outcome.attackerUnitsAfter).toHaveLength(0);
   });
@@ -322,8 +330,9 @@ describe('resolveCombatEncounter', () => {
       attackerUnits: [makeUnit('u1', 'a', 5), makeUnit('u2', 'a', 4)],
       defenderUnits: [makeUnit('u3', 'b', 6)],
     };
-    const o1 = resolveCombatEncounter(encounter, theme, createPRNG(77));
-    const o2 = resolveCombatEncounter(encounter, theme, createPRNG(77));
+    const state = makeGameState([[]], { a: makeCiv('a'), b: makeCiv('b') });
+    const o1 = resolveCombatEncounter(encounter, state, theme, createPRNG(77));
+    const o2 = resolveCombatEncounter(encounter, state, theme, createPRNG(77));
     expect(o1.result.outcome).toBe(o2.result.outcome);
     expect(o1.result.attackerStrengthLost).toBe(o2.result.attackerStrengthLost);
     expect(o1.result.defenderStrengthLost).toBe(o2.result.defenderStrengthLost);
@@ -332,9 +341,6 @@ describe('resolveCombatEncounter', () => {
 
   it('garrison bonus gives defender an advantage over equal-strength attacker', () => {
     const theme = makeTheme();
-    // Attacker: strength 8, plains (mod 1.0) → power 8
-    // Defender: strength 8, garrisoned → power 8 * 1.25 = 10
-    // With identical rolls, defender score is 25% higher → defender wins
     const encounter: CombatEncounter = {
       coord: { col: 0, row: 0 },
       terrain: 'plains',
@@ -343,13 +349,11 @@ describe('resolveCombatEncounter', () => {
       attackerUnits: [makeUnit('u1', 'a', 8)],
       defenderUnits: [makeUnit('u2', 'b', 8, 5, true)], // garrisoned
     };
-    // Use a PRNG that produces equal rolls for both sides (hard to guarantee,
-    // so test the power calculation directly instead)
     const attackerPower = calculateEffectivePower(
-      encounter.attackerUnits, 'plains', false, theme,
+      encounter.attackerUnits, 'plains', false, theme, 0, 0, 0,
     );
     const defenderPower = calculateEffectivePower(
-      encounter.defenderUnits, 'plains', true, theme,
+      encounter.defenderUnits, 'plains', true, theme, 0, 0, 0,
     );
     expect(defenderPower).toBeGreaterThan(attackerPower);
   });
@@ -364,17 +368,16 @@ describe('resolveCombatEncounter', () => {
       attackerUnits: [makeUnit('u1', 'a', 100)],
       defenderUnits: [makeUnit('u2', 'b', 1)],
     };
-    // Even in mountains, strength 100 beats strength 1
-    const outcome = resolveCombatEncounter(encounter, theme, createPRNG(1));
+    const state = makeGameState([[]], { a: makeCiv('a'), b: makeCiv('b') });
+    const outcome = resolveCombatEncounter(encounter, state, theme, createPRNG(1));
     expect(outcome.result.outcome).toBe('attacker_wins');
-    // But attacker power was reduced: 100 * 0.8 = 80 (vs 1 * 1.0 = 1)
     const attackerPower = calculateEffectivePower(
-      encounter.attackerUnits, 'mountains', false, theme,
+      encounter.attackerUnits, 'mountains', false, theme, 0, 0, 0,
     );
     expect(attackerPower).toBe(80);
   });
 
-  it('losing side has all or most units destroyed when routed', () => {
+  it('losing side has most units destroyed when routed', () => {
     const theme = makeTheme();
     const encounter: CombatEncounter = {
       coord: { col: 0, row: 0 },
@@ -384,8 +387,9 @@ describe('resolveCombatEncounter', () => {
       attackerUnits: [makeUnit('u1', 'a', 50)],
       defenderUnits: [makeUnit('u2', 'b', 1, 5)],
     };
-    const outcome = resolveCombatEncounter(encounter, theme, createPRNG(42));
-    // Defender strength = 1, so full 1 damage applied → u2 destroyed
+    const state = makeGameState([[]], { a: makeCiv('a'), b: makeCiv('b') });
+    const outcome = resolveCombatEncounter(encounter, state, theme, createPRNG(42));
+    // Defender strength = 1, 60% of 1 = max(1,0) = 1 -> destroyed
     if (outcome.result.outcome === 'attacker_wins') {
       expect(outcome.defenderUnitsAfter).toHaveLength(0);
     } else {
@@ -403,20 +407,20 @@ describe('resolveCombatEncounter', () => {
       attackerUnits: [makeUnit('u1', 'ragosa', 5)],
       defenderUnits: [makeUnit('u2', 'valledo', 5)],
     };
-    const outcome = resolveCombatEncounter(encounter, theme, createPRNG(1));
+    const state = makeGameState([[]], {
+      ragosa: makeCiv('ragosa'),
+      valledo: makeCiv('valledo'),
+    });
+    const outcome = resolveCombatEncounter(encounter, state, theme, createPRNG(1));
     expect(outcome.result.attackerCivId).toBe('ragosa');
     expect(outcome.result.defenderCivId).toBe('valledo');
     expect(outcome.result.coord).toEqual({ col: 3, row: 7 });
   });
 
   it('draw distributes damage to both sides', () => {
-    // We can force a draw by making both scores equal.
-    // To do that reliably, we need both sides to roll the same die value AND
-    // have equal power. Use strength 1 for both — if rolls are equal, it's a draw.
-    // This test verifies draw logic by testing applyDamageToUnits with 50% damage.
     const units = [makeUnit('u1', 'a', 10, 5)];
-    const result = applyDamageToUnits(units, 5); // 50% of 10
-    expect(result[0].strength).toBe(5);
+    const result = applyDamageToUnits(units, 4); // 40% of 10
+    expect(result[0].strength).toBe(6);
   });
 });
 
@@ -444,7 +448,6 @@ describe('resolveCombat — no combat when civs are at peace', () => {
     const unitA = makeUnit('u1', 'civ-a', 5);
     const unitB = makeUnit('u2', 'civ-b', 5);
     const hex = makeHex(0, 0, 'plains', 'civ-a', [unitA, unitB]);
-    // Peace: no war declared
     const civA = makeCiv('civ-a', { 'civ-b': 'peace' });
     const civB = makeCiv('civ-b', { 'civ-a': 'peace' });
     const state = makeGameState([[hex]], { 'civ-a': civA, 'civ-b': civB });
@@ -457,8 +460,6 @@ describe('resolveCombat — no combat when civs are at peace', () => {
 describe('resolveCombat — combat resolves for civs at war', () => {
   it('reduces total units on a hex when civs are at war', () => {
     const theme = makeTheme();
-    // civ-a controls hex, civ-b attacks (at war)
-    // civ-b strength 1 vs civ-a strength 50 — civ-a should win
     const unitA = makeUnit('u1', 'civ-a', 50);
     const unitB = makeUnit('u2', 'civ-b', 1);
     const hex = makeHex(0, 0, 'plains', 'civ-a', [unitA, unitB]);
@@ -467,9 +468,9 @@ describe('resolveCombat — combat resolves for civs at war', () => {
     const state = makeGameState([[hex]], { 'civ-a': civA, 'civ-b': civB });
 
     const { state: next } = resolveCombat(state, theme, createPRNG(42));
-    const remainingUnits = next.map[0][0].units;
     // civ-b unit (strength 1) should be destroyed after losing
-    const civBUnitsLeft = remainingUnits.filter((u) => u.civilizationId === 'civ-b');
+    const allUnits = next.map.flat().flatMap((h) => h.units);
+    const civBUnitsLeft = allUnits.filter((u) => u.civilizationId === 'civ-b');
     expect(civBUnitsLeft).toHaveLength(0);
   });
 
@@ -484,7 +485,9 @@ describe('resolveCombat — combat resolves for civs at war', () => {
 
     const { state: r1 } = resolveCombat(state, theme, createPRNG(100));
     const { state: r2 } = resolveCombat(state, theme, createPRNG(100));
-    expect(r1.map[0][0].units.length).toBe(r2.map[0][0].units.length);
+    const r1Units = r1.map.flat().flatMap((h) => h.units);
+    const r2Units = r2.map.flat().flatMap((h) => h.units);
+    expect(r1Units.length).toBe(r2Units.length);
   });
 
   it('leaves hexes with a single civ untouched', () => {
@@ -522,9 +525,8 @@ describe('resolveCombat — combat resolves for civs at war', () => {
 });
 
 describe('resolveCombat — no-controller hex', () => {
-  it('determines defender alphabetically when hex is uncontrolled', () => {
+  it('determines defender randomly when hex is uncontrolled', () => {
     const theme = makeTheme();
-    // 'civ-a' < 'civ-b' alphabetically → civ-a defends, civ-b attacks
     const unitA = makeUnit('u1', 'civ-a', 50);
     const unitB = makeUnit('u2', 'civ-b', 1);
     const hex = makeHex(0, 0, 'plains', null, [unitA, unitB]); // no controller
@@ -533,8 +535,9 @@ describe('resolveCombat — no-controller hex', () => {
     const state = makeGameState([[hex]], { 'civ-a': civA, 'civ-b': civB });
 
     const { state: next } = resolveCombat(state, theme, createPRNG(42));
-    // civ-b (strength 1) attacked civ-a (strength 50) → civ-b should be destroyed
-    const civBUnits = next.map[0][0].units.filter((u) => u.civilizationId === 'civ-b');
+    // civ-b (strength 1) should be destroyed regardless of who defends
+    const allUnits = next.map.flat().flatMap((h) => h.units);
+    const civBUnits = allUnits.filter((u) => u.civilizationId === 'civ-b');
     expect(civBUnits).toHaveLength(0);
   });
 });

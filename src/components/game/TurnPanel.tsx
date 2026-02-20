@@ -142,7 +142,18 @@ export function TurnPanel({
           {resolving ? <span className="flex items-center gap-2"><Spinner size={14} /> Resolving…</span> : 'Resolve Turn'}
         </Button>
       ) : alreadySubmitted ? (
-        <span className="text-sm text-stone-500">Waiting for others…</span>
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-stone-500">Waiting for others…</span>
+          <button
+            onClick={() => {
+              // Allow order revision by removing this player's submission from the local state
+              setSubmitted((prev) => prev.filter((r) => r.player_id !== currentUserId));
+            }}
+            className="text-xs text-indigo-400 hover:text-indigo-300 underline"
+          >
+            Revise Orders
+          </button>
+        </div>
       ) : (
         <Button onClick={handleSubmit} disabled={submitting}>
           {submitting ? <span className="flex items-center gap-2"><Spinner size={14} /> Submitting…</span> : 'Submit Turn'}

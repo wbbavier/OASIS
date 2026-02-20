@@ -3,7 +3,7 @@
 // All functions are pure: no side effects, no async, no randomness.
 
 import type { GameState, Hex, Unit, CivilizationState } from '@/engine/types';
-import type { ThemePackage, TurnCycleEffect, ResourceDefinition } from '@/themes/schema';
+import type { ThemePackage, TurnCycleEffect, ResourceDefinition, TechEffect } from '@/themes/schema';
 
 // ---------------------------------------------------------------------------
 // Seasonal cycle
@@ -141,6 +141,77 @@ export function applyResourceInteractions(
   return result;
 }
 
+/**
+ * Same as applyResourceInteractions but caps each resource's interaction
+ * bonus at 20 per turn to prevent runaway scaling.
+ */
+export function applyResourceInteractionsCapped(
+  resources: Record<string, number>,
+  theme: ThemePackage,
+): Record<string, number> {
+  const result = { ...resources };
+  const bonusAccum: Record<string, number> = {};
+  for (const interaction of theme.mechanics.resourceInteractions) {
+    const sourceAmount = result[interaction.sourceId] ?? 0;
+    const bonus = Math.floor(sourceAmount * interaction.multiplier);
+    if (bonus > 0) {
+      const currentBonus = bonusAccum[interaction.targetId] ?? 0;
+      const cappedBonus = Math.min(bonus, 20 - currentBonus);
+      if (cappedBonus > 0) {
+        result[interaction.targetId] = (result[interaction.targetId] ?? 0) + cappedBonus;
+        bonusAccum[interaction.targetId] = currentBonus + cappedBonus;
+      }
+    }
+  }
+  return result;
+}
+
+// ---------------------------------------------------------------------------
+// Tech effects
+// ---------------------------------------------------------------------------
+
+/**
+ * Collect resource multipliers from completed techs for a civ.
+ * Multiple techs affecting the same resource multiply together.
+ */
+export function getTechResourceMultipliers(
+  completedTechs: string[],
+  theme: ThemePackage,
+): Record<string, number> {
+  const multipliers: Record<string, number> = {};
+  for (const techId of completedTechs) {
+    const techDef = theme.techTree.find((t) => t.id === techId);
+    if (!techDef) continue;
+    for (const effect of techDef.effects) {
+      if (effect.kind === 'resource_modifier') {
+        multipliers[effect.resourceId] =
+          (multipliers[effect.resourceId] ?? 1.0) * effect.multiplier;
+      }
+    }
+  }
+  return multipliers;
+}
+
+/**
+ * Sum stability modifiers from completed techs for a civ.
+ */
+export function getTechStabilityBonus(
+  completedTechs: string[],
+  theme: ThemePackage,
+): number {
+  let bonus = 0;
+  for (const techId of completedTechs) {
+    const techDef = theme.techTree.find((t) => t.id === techId);
+    if (!techDef) continue;
+    for (const effect of techDef.effects) {
+      if (effect.kind === 'stability_modifier') {
+        bonus += effect.value;
+      }
+    }
+  }
+  return bonus;
+}
+
 // ---------------------------------------------------------------------------
 // Main economy resolution
 // ---------------------------------------------------------------------------
@@ -176,12 +247,21 @@ export function resolveEconomy(state: GameState, theme: ThemePackage): GameState
     let stabilityDelta = 0;
     let totalBuildingUpkeep = 0;
 
+    // Tech modifiers for this civ
+    const techMultipliers = getTechResourceMultipliers(civ.completedTechs, theme);
+    const techStabilityBonus = getTechStabilityBonus(civ.completedTechs, theme);
+
     for (const hex of allHexes) {
       if (hex.controlledBy !== civId) continue;
 
       // Terrain yields for every resource defined in the theme
       for (const resource of theme.resources) {
-        const y = calculateTerrainYieldForHex(hex, resource, seasonEffect);
+        let y = calculateTerrainYieldForHex(hex, resource, seasonEffect);
+        // Apply tech resource multipliers (after seasonal, before building effects)
+        const techMul = techMultipliers[resource.id];
+        if (techMul !== undefined) {
+          y *= techMul;
+        }
         if (y !== 0) {
           yieldAccum[resource.id] = (yieldAccum[resource.id] ?? 0) + y;
         }
@@ -205,9 +285,24 @@ export function resolveEconomy(state: GameState, theme: ThemePackage): GameState
       stabilityDelta += seasonEffect.stabilityModifier;
     }
 
+    // Tech stability bonus
+    stabilityDelta += techStabilityBonus;
+
     // Deduct all upkeep from the dinars yield accumulator
     const totalUpkeep = totalBuildingUpkeep + (unitUpkeepByCiv[civId] ?? 0);
     yieldAccum['dinars'] = (yieldAccum['dinars'] ?? 0) - totalUpkeep;
+
+    // Grain consumption: each settlement consumes grain proportional to population
+    const civSettlements = allHexes.filter(
+      (h) => h.controlledBy === civId && h.settlement !== null,
+    );
+    let grainConsumption = 0;
+    for (const hex of civSettlements) {
+      grainConsumption += Math.floor((hex.settlement!.population) / 100);
+    }
+    if (grainConsumption > 0) {
+      yieldAccum['grain'] = (yieldAccum['grain'] ?? 0) - grainConsumption;
+    }
 
     // Apply floored yields to current resources (floored at 0)
     const newResources: Record<string, number> = { ...civ.resources };
@@ -217,7 +312,14 @@ export function resolveEconomy(state: GameState, theme: ThemePackage): GameState
     }
 
     // Apply resource interactions (bonus fractions of source → target)
-    const finalResources = applyResourceInteractions(newResources, theme);
+    // Cap interaction bonuses at 20 per resource per turn
+    const finalResources = applyResourceInteractionsCapped(newResources, theme);
+
+    // Bankruptcy penalty: if dinars income is negative and stored dinars is 0
+    const dinarsYield = Math.floor(yieldAccum['dinars'] ?? 0);
+    if (dinarsYield < 0 && (finalResources['dinars'] ?? 0) === 0) {
+      stabilityDelta -= 5;
+    }
 
     // Apply stability change, clamped to [0, 100]
     const newStability = Math.max(

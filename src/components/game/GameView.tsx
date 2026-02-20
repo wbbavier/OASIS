@@ -4,6 +4,7 @@ import Link from 'next/link';
 import type { AnyOrder, Hex, HexCoord, MoveOrder } from '@/engine/types';
 import type { ThemePackage } from '@/themes/schema';
 import { HexMap } from '@/components/map/HexMap';
+import { TerrainLegend } from '@/components/map/TerrainLegend';
 import { CivDashboard } from '@/components/game/CivDashboard';
 import { TurnPanel } from '@/components/game/TurnPanel';
 import { TurnSummaryPanel } from '@/components/game/TurnSummaryPanel';
@@ -62,11 +63,23 @@ export function GameView({
   const civColors = Object.fromEntries(
     theme.civilizations.map((c) => [c.id, c.color])
   );
+  const civNames = Object.fromEntries(
+    theme.civilizations.map((c) => [c.id, c.name])
+  );
   const lastSummary =
     gameState.turnHistory.length > 0
       ? gameState.turnHistory[gameState.turnHistory.length - 1]
       : null;
   const humanPlayerIds = humanPlayers.map((p) => p.playerId);
+  const isGameOver = gameState.phase === 'completed';
+
+  // Resource deltas from last turn summary
+  const resourceDeltas = lastSummary?.entries.find((e) => e.civId === currentCivId)?.resourceDeltas ?? {};
+
+  // Extract victory message from last summary's victory_defeat log messages
+  const victoryMessage = lastSummary?.entries
+    .flatMap((e) => e.narrativeLines)
+    .find((line) => line.includes('victory') || line.includes('Victory')) ?? null;
 
   function handleHexClick(hex: Hex) {
     if (!gameState) return;
@@ -134,8 +147,12 @@ export function GameView({
           <h1 className="text-xl font-bold text-stone-100">{gameName}</h1>
         </div>
         <div className="flex items-center gap-2">
-          <span className="rounded bg-emerald-800 px-2 py-0.5 text-xs font-medium text-emerald-200">
-            Active
+          <span className={`rounded px-2 py-0.5 text-xs font-medium ${
+            isGameOver
+              ? 'bg-amber-800 text-amber-200'
+              : 'bg-emerald-800 text-emerald-200'
+          }`}>
+            {isGameOver ? 'Completed' : 'Active'}
           </span>
           <button
             onClick={refresh}
@@ -146,13 +163,25 @@ export function GameView({
         </div>
       </div>
 
+      {/* Game over banner */}
+      {isGameOver && (
+        <div className="rounded-xl border-2 border-amber-500 bg-amber-900/30 px-6 py-4 text-center">
+          <h2 className="text-2xl font-bold text-amber-300 mb-1">Game Over</h2>
+          {victoryMessage ? (
+            <p className="text-stone-200">{victoryMessage}</p>
+          ) : (
+            <p className="text-stone-300">The game has ended.</p>
+          )}
+        </div>
+      )}
+
       {/* Last turn summary */}
       {lastSummary && civ && (
-        <TurnSummaryPanel summary={lastSummary} civId={currentCivId} />
+        <TurnSummaryPanel summary={lastSummary} civId={currentCivId} theme={theme} />
       )}
 
       {/* Map + Dashboard */}
-      <div className="flex gap-4 items-start">
+      <div className="flex flex-col md:flex-row gap-4 items-start">
         <div className="flex-1 min-w-0">
           {selectedCoord && (
             <p className="mb-1 text-xs text-emerald-400">
@@ -163,11 +192,13 @@ export function GameView({
             map={gameState.map}
             currentCivId={currentCivId}
             civColors={civColors}
+            civNames={civNames}
             onHexClick={handleHexClick}
             selectedCoord={selectedCoord}
             reachableCoords={reachableCoords}
             fogOfWar={gameState.config.fogOfWar}
           />
+          <TerrainLegend />
         </div>
 
         {civ && civDef && (
@@ -177,12 +208,13 @@ export function GameView({
             allCivDefs={theme.civilizations}
             resources={theme.resources}
             turn={gameState.turn}
+            resourceDeltas={resourceDeltas}
           />
         )}
       </div>
 
-      {/* Orders panel */}
-      {civ && (
+      {/* Orders panel (hidden when game is over) */}
+      {civ && !isGameOver && (
         <OrdersPanel
           gameState={gameState}
           theme={theme}
@@ -192,8 +224,8 @@ export function GameView({
         />
       )}
 
-      {/* Turn panel */}
-      {civ && (
+      {/* Turn panel (hidden when game is over) */}
+      {civ && !isGameOver && (
         <TurnPanel
           gameId={gameId}
           gameState={gameState}

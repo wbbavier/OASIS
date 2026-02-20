@@ -207,6 +207,12 @@ export interface EventResponse {
   choiceId: string;
 }
 
+export interface RecruitOrder {
+  kind: 'recruit';
+  settlementId: string;
+  unitDefinitionId: string;
+}
+
 export interface ResourceAllocationOrder {
   kind: 'resource_allocation';
   allocations: Record<string, number>;
@@ -218,6 +224,7 @@ export type AnyOrder =
   | ResearchOrder
   | DiplomaticAction
   | EventResponse
+  | RecruitOrder
   | ResourceAllocationOrder;
 
 export interface PlayerOrders {

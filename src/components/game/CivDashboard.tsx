@@ -16,13 +16,14 @@ interface CivDashboardProps {
   allCivDefs: CivilizationDefinition[];
   resources: ResourceDefinition[];
   turn: number;
+  resourceDeltas?: Record<string, number>;
 }
 
-export function CivDashboard({ civ, civDef, allCivDefs, resources, turn }: CivDashboardProps) {
+export function CivDashboard({ civ, civDef, allCivDefs, resources, turn, resourceDeltas }: CivDashboardProps) {
   const stabilityPct = Math.max(0, Math.min(100, civ.stability));
 
   return (
-    <div className="flex flex-col gap-3 w-64 flex-shrink-0">
+    <div className="flex flex-col gap-3 w-full md:w-64 flex-shrink-0">
       {/* Civ identity */}
       <Card className="p-4">
         <div className="flex items-center gap-2 mb-1">
@@ -36,12 +37,22 @@ export function CivDashboard({ civ, civDef, allCivDefs, resources, turn }: CivDa
       <Card className="p-4">
         <h3 className="text-xs font-semibold uppercase tracking-wide text-stone-500 mb-2">Resources</h3>
         <ul className="flex flex-col gap-1">
-          {resources.map((r) => (
-            <li key={r.id} className="flex justify-between text-sm">
-              <span className="text-stone-400">{r.name}</span>
-              <span className="font-mono text-stone-200">{civ.resources[r.id] ?? 0}</span>
-            </li>
-          ))}
+          {resources.map((r) => {
+            const delta = resourceDeltas?.[r.id];
+            return (
+              <li key={r.id} className="flex justify-between text-sm">
+                <span className="text-stone-400">{r.name}</span>
+                <span className="flex items-center gap-1.5">
+                  <span className="font-mono text-stone-200">{civ.resources[r.id] ?? 0}</span>
+                  {delta !== undefined && delta !== 0 && (
+                    <span className={`text-xs font-mono ${delta > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                      {delta > 0 ? '+' : ''}{delta}
+                    </span>
+                  )}
+                </span>
+              </li>
+            );
+          })}
         </ul>
       </Card>
 

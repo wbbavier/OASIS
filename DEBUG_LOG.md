@@ -135,6 +135,34 @@ This is now included at the bottom of the combined setup script.
 
 ---
 
+## [2026-02-20] Units can only move once ever — movesRemaining never reset
+
+**Symptom:** After turn 1, units showed `movesRemaining: 0` and could not be selected for movement. Only newly spawned units could move. Both human and AI units were affected.
+
+**Root cause:** When a unit moves, `resolveMovement()` sets `movesRemaining: 0` on the moved unit. However, nothing in the turn resolution pipeline ever reset `movesRemaining` back to the unit definition's `moves` value at the start of a new turn. Once spent, moves were gone forever.
+
+**Fix:** Added a map-wide reset at the top of `resolveTurn()` (before any orders are processed) that iterates all units and sets `movesRemaining` to the value from `theme.units` matching `unit.definitionId`.
+
+**Files changed:** `src/engine/turn-resolver.ts`
+
+**Rule going forward:** Any per-turn resource on a unit or entity (moves, actions, etc.) must be explicitly reset at the start of each turn in `resolveTurn()`. Never assume a value carries over correctly — add the reset step and look up the canonical value from the theme definition.
+
+---
+
+## [2026-02-20] Movement validation accepts illegal diagonal moves on hex grid
+
+**Symptom:** Units could move to hexes that are not true hex neighbors — specifically the two "diagonal" positions that Chebyshev distance considers adjacent but the odd-r offset hex grid does not.
+
+**Root cause:** `resolveMovement` in `turn-resolver.ts` validated each movement step using Chebyshev distance (`Math.abs(dCol) <= 1 && Math.abs(dRow) <= 1`), which allows 8 directions. However, the hex grid uses odd-r offset coordinates with only 6 neighbors per hex. Two of the 8 Chebyshev-adjacent cells are not valid hex neighbors.
+
+**Fix:** Replaced the Chebyshev distance check with a call to `getNeighbors(prev, cols, rows)` from `map-generator.ts`, which correctly computes the 6 hex neighbors using odd-r offset rules. Each step in the path is now validated against the actual neighbor list.
+
+**Files changed:** `src/engine/turn-resolver.ts`
+
+**Rule going forward:** Never use Chebyshev or Manhattan distance for hex adjacency checks. Always use `getNeighbors()` from `map-generator.ts` which encodes the correct odd-r offset neighbor offsets.
+
+---
+
 ## Template for new entries
 
 ```

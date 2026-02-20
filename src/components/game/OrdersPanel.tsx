@@ -4,6 +4,7 @@ import type { GameState, AnyOrder } from '@/engine/types';
 import type { ThemePackage } from '@/themes/schema';
 import { ResearchPanel } from './ResearchPanel';
 import { BuildPanel } from './BuildPanel';
+import { RecruitPanel } from './RecruitPanel';
 import { DiplomacyPanel } from './DiplomacyPanel';
 import { EventsPanel } from './EventsPanel';
 
@@ -15,8 +16,8 @@ interface OrdersPanelProps {
   setPendingOrders: (orders: AnyOrder[]) => void;
 }
 
-type Tab = 'Research' | 'Build' | 'Diplomacy' | 'Events';
-const TABS: Tab[] = ['Research', 'Build', 'Diplomacy', 'Events'];
+type Tab = 'Research' | 'Build' | 'Recruit' | 'Diplomacy' | 'Events';
+const TABS: Tab[] = ['Research', 'Build', 'Recruit', 'Diplomacy', 'Events'];
 
 export function OrdersPanel({
   gameState,
@@ -60,7 +61,7 @@ export function OrdersPanel({
       </div>
 
       {/* Tab content */}
-      <div className="p-4 max-h-80 overflow-y-auto">
+      <div className="p-4 max-h-[50vh] overflow-y-auto">
         {activeTab === 'Research' && (
           <ResearchPanel
             gameState={gameState}
@@ -72,6 +73,15 @@ export function OrdersPanel({
         )}
         {activeTab === 'Build' && (
           <BuildPanel
+            gameState={gameState}
+            theme={theme}
+            currentCivId={currentCivId}
+            pendingOrders={pendingOrders}
+            setPendingOrders={setPendingOrders}
+          />
+        )}
+        {activeTab === 'Recruit' && (
+          <RecruitPanel
             gameState={gameState}
             theme={theme}
             currentCivId={currentCivId}
@@ -110,6 +120,7 @@ export function OrdersPanel({
             else if (o.kind === 'diplomatic') label = `${o.actionType.replace(/_/g, ' ')} → ${o.targetCivId}`;
             else if (o.kind === 'event_response') label = `Event choice: ${o.choiceId}`;
             else if (o.kind === 'move') label = `Move unit`;
+            else if (o.kind === 'recruit') label = `Recruit: ${o.unitDefinitionId} @ ${o.settlementId}`;
             else if (o.kind === 'resource_allocation') label = `Resource alloc`;
             return (
               <span

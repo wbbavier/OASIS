@@ -68,6 +68,17 @@ export function initializeGameState(
       startingTensionAxes[axis.id] = 0;
     }
 
+    // Calculate starting stability from the average of this civ's settlement stabilities
+    const civAnchors = theme.map.settlementAnchors.filter(
+      (a) => a.civilizationId === civDef.id,
+    );
+    const startingStability =
+      civAnchors.length > 0
+        ? Math.round(
+            civAnchors.reduce((sum, a) => sum + a.startingStability, 0) / civAnchors.length,
+          )
+        : 70; // fallback
+
     civilizations[civDef.id] = {
       id: civDef.id,
       playerId: playerMap.get(civDef.id) ?? null,
@@ -75,7 +86,7 @@ export function initializeGameState(
       techProgress: {},
       completedTechs: [...civDef.startingTechs],
       culturalInfluence: 0,
-      stability: 80,
+      stability: startingStability,
       diplomaticRelations: startingRelations,
       tensionAxes: startingTensionAxes,
       isEliminated: false,
@@ -103,8 +114,12 @@ export function initializeGameState(
     }
     if (capitalRow === -1) continue;
 
-    // Use the first available unit type that exists in the theme (fallback to a minimal unit)
-    const unitDef = theme.units[0];
+    // Find a unit type appropriate for this civ's starting techs
+    const civTechs = civilizations[civDef.id]?.completedTechs ?? civDef.startingTechs;
+    const unitDef =
+      theme.units.find(
+        (u) => u.prerequisiteTech === null || civTechs.includes(u.prerequisiteTech),
+      ) ?? theme.units[0];
     const startingUnits: Unit[] = unitDef
       ? [
           {

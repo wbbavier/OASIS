@@ -2211,8 +2211,9 @@
   ],
   "victoryConditions": [
     { "kind": "eliminate_all" },
-    { "kind": "control_hexes", "count": 80 },
-    { "kind": "resource_accumulate", "resourceId": "faith", "amount": 500 }
+    { "kind": "control_hexes", "count": 40 },
+    { "kind": "resource_accumulate", "resourceId": "faith", "amount": 500 },
+    { "kind": "resource_accumulate", "resourceId": "trade_goods", "amount": 300 }
   ],
   "defeatConditions": [
     { "kind": "capital_lost" },

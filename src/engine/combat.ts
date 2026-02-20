@@ -1,16 +1,18 @@
-// Combat resolution — Phase 2 implementation.
-// Seeded dice rolls, unit strength/morale resolution, terrain bonuses, garrison defence.
+// Combat resolution — reworked with softer casualties, tech/seasonal/civ modifiers,
+// retreat mechanics, and random defender selection on neutral hexes.
 // All functions are pure: no side effects, no async.
 
 import type {
   GameState,
   Unit,
+  Hex,
   HexCoord,
   CombatResultSummary,
   PRNG,
   TerrainType,
 } from '@/engine/types';
 import type { ThemePackage } from '@/themes/schema';
+import { getNeighbors } from '@/engine/map-generator';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -18,6 +20,11 @@ import type { ThemePackage } from '@/themes/schema';
 
 /** Multiplier applied to garrisoned defenders' total strength. */
 const GARRISON_DEFENSE_BONUS = 1.25;
+
+/** Casualty rates by outcome */
+const LOSER_CASUALTY_RATE = 0.6;
+const WINNER_CASUALTY_RATE = 0.15;
+const DRAW_CASUALTY_RATE = 0.4;
 
 // ---------------------------------------------------------------------------
 // Types
@@ -35,45 +42,132 @@ export interface CombatEncounter {
 export interface CombatOutcome {
   attackerUnitsAfter: Unit[];
   defenderUnitsAfter: Unit[];
+  loserCivId: string | null; // null on draw
   result: CombatResultSummary;
 }
 
 // ---------------------------------------------------------------------------
-// Helpers
+// Tech combat bonus
+// ---------------------------------------------------------------------------
+
+/**
+ * Sum all combat_modifier effects from completed techs for a civ.
+ */
+export function getTechCombatBonus(
+  state: GameState,
+  civId: string,
+  theme: ThemePackage,
+): number {
+  const civ = state.civilizations[civId];
+  if (!civ) return 0;
+  let bonus = 0;
+  for (const techId of civ.completedTechs) {
+    const techDef = theme.techTree.find((t) => t.id === techId);
+    if (!techDef) continue;
+    for (const effect of techDef.effects) {
+      if (effect.kind === 'combat_modifier') {
+        bonus += effect.value;
+      }
+    }
+  }
+  return bonus;
+}
+
+// ---------------------------------------------------------------------------
+// Seasonal combat modifier
+// ---------------------------------------------------------------------------
+
+/**
+ * Read the combatModifier for the current season from the theme's turn cycle.
+ */
+export function getSeasonCombatModifier(
+  state: GameState,
+  theme: ThemePackage,
+): number {
+  const { turnCycleLength, turnCycleEffects, turnCycleNames } = theme.mechanics;
+  if (turnCycleLength <= 0 || turnCycleEffects.length === 0) return 0;
+  const phaseIndex = (state.turn - 1) % turnCycleLength;
+  const phaseName = turnCycleNames[phaseIndex];
+  const effect = phaseName
+    ? turnCycleEffects.find((e) => e.phase === phaseName) ?? turnCycleEffects[phaseIndex]
+    : turnCycleEffects[phaseIndex];
+  return effect?.combatModifier ?? 0;
+}
+
+// ---------------------------------------------------------------------------
+// Civ special ability parsing
+// ---------------------------------------------------------------------------
+
+/**
+ * Parse known combat-related special ability patterns.
+ * Returns { attackBonus, defendBonus(terrain) }.
+ */
+function parseCivCombatAbilities(
+  specialAbilities: string[],
+  isAttacking: boolean,
+  terrain: TerrainType,
+): number {
+  let bonus = 0;
+  for (const ability of specialAbilities) {
+    // "Units gain +N combat strength when attacking"
+    const attackMatch = ability.match(/Units gain \+(\d+) combat strength when attacking/i);
+    if (attackMatch && isAttacking) {
+      bonus += parseInt(attackMatch[1], 10);
+    }
+    // "Units defending in <terrain> gain +N combat strength"
+    const defendMatch = ability.match(/Units defending in (\w+) gain \+(\d+) combat strength/i);
+    if (defendMatch && !isAttacking) {
+      const abilityTerrain = defendMatch[1].toLowerCase();
+      if (abilityTerrain === terrain) {
+        bonus += parseInt(defendMatch[2], 10);
+      }
+    }
+  }
+  return bonus;
+}
+
+// ---------------------------------------------------------------------------
+// Effective power
 // ---------------------------------------------------------------------------
 
 /**
  * Calculate the effective combat power for a group of units on a given terrain.
- *
- * Attackers are penalised by terrain difficulty (combatModifiers < 1 = harder).
- * Defenders receive the full garrison bonus when any unit is garrisoned.
- * Defenders are NOT penalised by terrain — they fight on home ground.
+ * Now includes tech bonus, seasonal modifier, and civ special abilities.
  */
 export function calculateEffectivePower(
   units: Unit[],
   terrain: TerrainType,
   isDefending: boolean,
   theme: ThemePackage,
+  techBonus: number,
+  seasonalMod: number,
+  civAbilityBonus: number,
 ): number {
   if (units.length === 0) return 0;
 
   const totalStrength = units.reduce((sum, u) => sum + u.strength, 0);
+  let power: number;
 
   if (isDefending) {
     const hasGarrison = units.some((u) => u.isGarrisoned);
-    return totalStrength * (hasGarrison ? GARRISON_DEFENSE_BONUS : 1.0);
+    power = totalStrength * (hasGarrison ? GARRISON_DEFENSE_BONUS : 1.0);
+  } else {
+    // Terrain modifier is applied only to the attacker
+    const terrainMod =
+      (theme.mechanics.combatModifiers[terrain as string] as number | undefined) ?? 1.0;
+    power = totalStrength * terrainMod;
   }
 
-  // Terrain modifier is applied only to the attacker
-  const terrainMod =
-    (theme.mechanics.combatModifiers[terrain as string] as number | undefined) ?? 1.0;
-  return totalStrength * terrainMod;
+  // Additive bonuses
+  power += techBonus + seasonalMod + civAbilityBonus;
+
+  return Math.max(0, power);
 }
 
 /**
  * Distribute `totalDamage` strength points across units, weakest first.
  * Each damaged unit also loses 1 morale.
- * Units reduced to strength ≤ 0 or morale ≤ 0 are destroyed (not returned).
+ * Units reduced to strength <= 0 or morale <= 0 are destroyed (not returned).
  */
 export function applyDamageToUnits(units: Unit[], totalDamage: number): Unit[] {
   // Sort ascending: weakest units absorb damage first
@@ -102,35 +196,108 @@ export function applyDamageToUnits(units: Unit[], totalDamage: number): Unit[] {
 }
 
 // ---------------------------------------------------------------------------
+// Retreat
+// ---------------------------------------------------------------------------
+
+/**
+ * Find the best retreat hex: one step toward the civ's capital via BFS.
+ * Returns null if no retreat path exists.
+ */
+export function findRetreatHex(
+  map: Hex[][],
+  from: HexCoord,
+  capitalCoord: HexCoord | null,
+  cols: number,
+  rows: number,
+): HexCoord | null {
+  if (!capitalCoord) return null;
+
+  const hexLookup = new Map<string, Hex>();
+  for (const row of map) {
+    for (const hex of row) {
+      hexLookup.set(`${hex.coord.col},${hex.coord.row}`, hex);
+    }
+  }
+
+  const fromKey = `${from.col},${from.row}`;
+  const targetKey = `${capitalCoord.col},${capitalCoord.row}`;
+  if (fromKey === targetKey) return null;
+
+  // BFS from `from` toward capital
+  const visited = new Set<string>([fromKey]);
+  const parent = new Map<string, string>();
+  const queue: HexCoord[] = [from];
+
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    const currentKey = `${current.col},${current.row}`;
+    const neighbors = getNeighbors(current, cols, rows);
+
+    for (const neighbor of neighbors) {
+      const nKey = `${neighbor.col},${neighbor.row}`;
+      if (visited.has(nKey)) continue;
+      visited.add(nKey);
+
+      const hex = hexLookup.get(nKey);
+      if (!hex || hex.terrain === 'sea') continue;
+
+      parent.set(nKey, currentKey);
+
+      if (nKey === targetKey) {
+        // Trace back to first step from `from`
+        let stepKey = nKey;
+        while (parent.get(stepKey) !== fromKey) {
+          stepKey = parent.get(stepKey)!;
+        }
+        const [sc, sr] = stepKey.split(',').map(Number);
+        return { col: sc, row: sr };
+      }
+
+      queue.push(neighbor);
+    }
+  }
+
+  return null;
+}
+
+// ---------------------------------------------------------------------------
 // Encounter resolution
 // ---------------------------------------------------------------------------
 
 /**
  * Resolve a single combat encounter between an attacker and a defender.
- *
- * Both sides roll d6; the roll is multiplied by the side's effective power.
- * The winner takes minimal casualties; the loser is routed (full strength lost).
- * In a draw both sides take 50% casualties.
- *
- * Uses two PRNG values (one per side) so the result is deterministic given
- * the same PRNG state.
+ * Softer casualty rates, tech/seasonal/civ modifiers applied.
  */
 export function resolveCombatEncounter(
   encounter: CombatEncounter,
+  state: GameState,
   theme: ThemePackage,
   prng: PRNG,
 ): CombatOutcome {
+  // Tech bonuses
+  const attackerTechBonus = getTechCombatBonus(state, encounter.attackerCivId, theme);
+  const defenderTechBonus = getTechCombatBonus(state, encounter.defenderCivId, theme);
+
+  // Seasonal modifier (additive, same for both sides)
+  const seasonalMod = getSeasonCombatModifier(state, theme);
+
+  // Civ special abilities
+  const attackerCivDef = theme.civilizations.find((c) => c.id === encounter.attackerCivId);
+  const defenderCivDef = theme.civilizations.find((c) => c.id === encounter.defenderCivId);
+  const attackerAbilityBonus = parseCivCombatAbilities(
+    attackerCivDef?.specialAbilities ?? [], true, encounter.terrain,
+  );
+  const defenderAbilityBonus = parseCivCombatAbilities(
+    defenderCivDef?.specialAbilities ?? [], false, encounter.terrain,
+  );
+
   const attackerPower = calculateEffectivePower(
-    encounter.attackerUnits,
-    encounter.terrain,
-    false,
-    theme,
+    encounter.attackerUnits, encounter.terrain, false, theme,
+    attackerTechBonus, seasonalMod, attackerAbilityBonus,
   );
   const defenderPower = calculateEffectivePower(
-    encounter.defenderUnits,
-    encounter.terrain,
-    true,
-    theme,
+    encounter.defenderUnits, encounter.terrain, true, theme,
+    defenderTechBonus, seasonalMod, defenderAbilityBonus,
   );
 
   // Each side rolls 1d6
@@ -146,22 +313,23 @@ export function resolveCombatEncounter(
   let outcome: 'attacker_wins' | 'defender_wins' | 'draw';
   let attackerStrengthLost: number;
   let defenderStrengthLost: number;
+  let loserCivId: string | null;
 
   if (attackerScore > defenderScore) {
-    // Attacker wins: loser is routed, winner takes token casualties
     outcome = 'attacker_wins';
-    attackerStrengthLost = Math.max(1, Math.floor(rawAttackerStrength * 0.1));
-    defenderStrengthLost = rawDefenderStrength;
+    attackerStrengthLost = Math.max(1, Math.floor(rawAttackerStrength * WINNER_CASUALTY_RATE));
+    defenderStrengthLost = Math.max(1, Math.floor(rawDefenderStrength * LOSER_CASUALTY_RATE));
+    loserCivId = encounter.defenderCivId;
   } else if (defenderScore > attackerScore) {
-    // Defender wins: attacker is repulsed, defender takes token casualties
     outcome = 'defender_wins';
-    attackerStrengthLost = rawAttackerStrength;
-    defenderStrengthLost = Math.max(1, Math.floor(rawDefenderStrength * 0.1));
+    attackerStrengthLost = Math.max(1, Math.floor(rawAttackerStrength * LOSER_CASUALTY_RATE));
+    defenderStrengthLost = Math.max(1, Math.floor(rawDefenderStrength * WINNER_CASUALTY_RATE));
+    loserCivId = encounter.attackerCivId;
   } else {
-    // Exact draw: both sides take 50% casualties
     outcome = 'draw';
-    attackerStrengthLost = Math.max(1, Math.floor(rawAttackerStrength * 0.5));
-    defenderStrengthLost = Math.max(1, Math.floor(rawDefenderStrength * 0.5));
+    attackerStrengthLost = Math.max(1, Math.floor(rawAttackerStrength * DRAW_CASUALTY_RATE));
+    defenderStrengthLost = Math.max(1, Math.floor(rawDefenderStrength * DRAW_CASUALTY_RATE));
+    loserCivId = null;
   }
 
   const attackerUnitsAfter = applyDamageToUnits(encounter.attackerUnits, attackerStrengthLost);
@@ -170,6 +338,7 @@ export function resolveCombatEncounter(
   return {
     attackerUnitsAfter,
     defenderUnitsAfter,
+    loserCivId,
     result: {
       attackerCivId: encounter.attackerCivId,
       defenderCivId: encounter.defenderCivId,
@@ -182,32 +351,43 @@ export function resolveCombatEncounter(
 }
 
 // ---------------------------------------------------------------------------
+// Capital lookup helper
+// ---------------------------------------------------------------------------
+
+function findCapitalCoord(map: Hex[][], civId: string): HexCoord | null {
+  for (const row of map) {
+    for (const hex of row) {
+      if (hex.controlledBy === civId && hex.settlement?.isCapital) {
+        return hex.coord;
+      }
+    }
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
 // Main combat resolution
 // ---------------------------------------------------------------------------
 
 /**
- * Scan every hex in the map.  Where units from two or more civilizations
+ * Scan every hex in the map. Where units from two or more civilizations
  * occupy the same hex and are at war, resolve a combat encounter.
  *
  * Attacker / defender determination:
  *   - If the hex has a `controlledBy` civ with units present, that civ defends.
- *   - Otherwise the first civ alphabetically defends.
- * Only one attacker is resolved per hex per turn (the first civ found at war
- * with the defender).  Subsequent attackers are left for the next turn.
- *
- * The map is scanned top-left → bottom-right, making resolution order
- * deterministic.  The same PRNG advances sequentially across all encounters.
+ *   - Otherwise a random civ defends (PRNG-based, no alphabetical bias).
  */
 export function resolveCombat(
   state: GameState,
   theme: ThemePackage,
   prng: PRNG,
 ): { state: GameState; combatResults: CombatResultSummary[] } {
-  // Shallow-copy the map rows and hex objects so we can update units immutably
   const newMap = state.map.map((row) =>
     row.map((hex) => ({ ...hex, units: [...hex.units] })),
   );
 
+  const mapRows = newMap.length;
+  const mapCols = mapRows > 0 ? (newMap[0]?.length ?? 0) : 0;
   const combatResults: CombatResultSummary[] = [];
 
   for (let row = 0; row < newMap.length; row++) {
@@ -225,11 +405,15 @@ export function resolveCombat(
       const civIds = Object.keys(civUnits);
       if (civIds.length < 2) continue;
 
-      // Determine defender (hex controller or first alphabetically)
-      const defenderCivId: string =
-        hex.controlledBy !== null && civUnits[hex.controlledBy]
-          ? hex.controlledBy
-          : [...civIds].sort()[0];
+      // Determine defender: hex controller with units, or random pick
+      let defenderCivId: string;
+      if (hex.controlledBy !== null && civUnits[hex.controlledBy]) {
+        defenderCivId = hex.controlledBy;
+      } else {
+        // Random defender selection instead of alphabetical
+        const idx = prng.nextInt(0, civIds.length - 1);
+        defenderCivId = civIds[idx];
+      }
 
       // Find the first civ on this hex that is at war with the defender
       const defenderRelations =
@@ -239,7 +423,7 @@ export function resolveCombat(
         (id) => id !== defenderCivId && defenderRelations[id] === 'war',
       );
 
-      if (!attackerCivId) continue; // No active war on this hex
+      if (!attackerCivId) continue;
 
       const attackerUnits = civUnits[attackerCivId] ?? [];
       const defenderUnits = civUnits[defenderCivId] ?? [];
@@ -255,7 +439,7 @@ export function resolveCombat(
         defenderUnits,
       };
 
-      const outcome = resolveCombatEncounter(encounter, theme, prng);
+      const outcome = resolveCombatEncounter(encounter, state, theme, prng);
       combatResults.push(outcome.result);
 
       // Rebuild the hex's unit list: keep unaffected civs, replace combatants
@@ -263,14 +447,55 @@ export function resolveCombat(
         (u) => u.civilizationId !== attackerCivId && u.civilizationId !== defenderCivId,
       );
 
+      // Retreat: surviving losing units move 1 hex toward their capital
+      let winnerUnits: Unit[];
+      let loserUnits: Unit[];
+      if (outcome.loserCivId === attackerCivId) {
+        winnerUnits = outcome.defenderUnitsAfter;
+        loserUnits = outcome.attackerUnitsAfter;
+      } else if (outcome.loserCivId === defenderCivId) {
+        winnerUnits = outcome.attackerUnitsAfter;
+        loserUnits = outcome.defenderUnitsAfter;
+      } else {
+        // Draw — both stay
+        winnerUnits = [...outcome.attackerUnitsAfter, ...outcome.defenderUnitsAfter];
+        loserUnits = [];
+      }
+
+      // Place winners on the battle hex
       newMap[row][col] = {
         ...hex,
-        units: [
-          ...unaffected,
-          ...outcome.attackerUnitsAfter,
-          ...outcome.defenderUnitsAfter,
-        ],
+        units: [...unaffected, ...winnerUnits, ...(outcome.loserCivId === null ? [] : [])],
       };
+
+      // Retreat losing survivors
+      if (outcome.loserCivId && loserUnits.length > 0) {
+        const capitalCoord = findCapitalCoord(newMap, outcome.loserCivId);
+        const retreatHex = findRetreatHex(newMap, hex.coord, capitalCoord, mapCols, mapRows);
+        if (retreatHex) {
+          // Place retreating units on the retreat hex
+          const rRow = retreatHex.row;
+          const rCol = retreatHex.col;
+          if (newMap[rRow]?.[rCol]) {
+            newMap[rRow][rCol] = {
+              ...newMap[rRow][rCol],
+              units: [...newMap[rRow][rCol].units, ...loserUnits],
+            };
+          } else {
+            // Fallback: stay on battle hex
+            newMap[row][col] = {
+              ...newMap[row][col],
+              units: [...newMap[row][col].units, ...loserUnits],
+            };
+          }
+        } else {
+          // No retreat path — stay on battle hex
+          newMap[row][col] = {
+            ...newMap[row][col],
+            units: [...newMap[row][col].units, ...loserUnits],
+          };
+        }
+      }
     }
   }
 

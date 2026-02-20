@@ -244,7 +244,7 @@ describe('generateAIOrders — construction heuristic', () => {
     }
   });
 
-  it('does not emit ConstructionOrder when grain >= 20', () => {
+  it('builds available building regardless of grain level (personality-driven)', () => {
     const map = [[makeHexWithSettlement(0, 0, 'civ-a', 'settlement-1')]];
     const state = makeState(
       { 'civ-a': makeCiv('civ-a', { resources: { grain: 25, dinars: 100 } }) },
@@ -252,7 +252,8 @@ describe('generateAIOrders — construction heuristic', () => {
     );
     const result = generateAIOrders(state, 'civ-a', makeTheme(), PRNG, SUBMITTED_AT);
     const constructionOrders = result.orders.filter((o) => o.kind === 'construction');
-    expect(constructionOrders.length).toBe(0);
+    // AI now builds based on personality preference, not grain threshold
+    expect(constructionOrders.length).toBe(1);
   });
 
   it('does not emit ConstructionOrder when civ lacks dinars', () => {

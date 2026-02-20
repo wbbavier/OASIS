@@ -3,6 +3,7 @@
 
 import type {
   GameState,
+  GamePhase,
   PlayerOrders,
   PRNG,
   ResolutionLog,
@@ -19,6 +20,7 @@ import { resolveDiplomacy } from '@/engine/diplomacy';
 import { resolveCombat } from '@/engine/combat';
 import { resolveEconomy } from '@/engine/economy';
 import { resolveEvents } from '@/engine/events';
+import { getNeighbors } from '@/engine/map-generator';
 
 export interface TurnResolutionResult {
   state: GameState;
@@ -116,13 +118,15 @@ function resolveMovement(
         continue;
       }
 
-      // Validate Chebyshev adjacency for each step
+      // Validate hex adjacency for each step (odd-r offset neighbors)
+      const mapRows = newMap.length;
+      const mapCols = mapRows > 0 ? (newMap[0]?.length ?? 0) : 0;
       let valid = true;
       let prev = newMap[srcRow][srcCol].coord;
       for (const step of path) {
-        const dCol = Math.abs(step.col - prev.col);
-        const dRow = Math.abs(step.row - prev.row);
-        if (dCol > 1 || dRow > 1) {
+        const neighbors = getNeighbors(prev, mapCols, mapRows);
+        const isNeighbor = neighbors.some((n) => n.col === step.col && n.row === step.row);
+        if (!isNeighbor) {
           messages.push(`Unit ${unitId}: non-adjacent step (${prev.col},${prev.row})→(${step.col},${step.row}), skipped`);
           valid = false;
           break;
@@ -284,6 +288,116 @@ function resolveConstruction(
 }
 
 // ---------------------------------------------------------------------------
+// Recruitment
+// ---------------------------------------------------------------------------
+
+function resolveRecruitment(
+  state: GameState,
+  orders: PlayerOrders[],
+  theme: ThemePackage,
+): { state: GameState; log: ResolutionLog } {
+  const messages: string[] = [];
+  let s = state;
+  const recruitedSettlements = new Set<string>(); // one recruit per settlement per turn
+
+  for (const playerOrders of orders) {
+    const civId = playerOrders.civilizationId;
+
+    for (const order of playerOrders.orders) {
+      if (order.kind !== 'recruit') continue;
+      const { settlementId, unitDefinitionId } = order;
+
+      const civ = s.civilizations[civId];
+      if (!civ || civ.isEliminated) continue;
+
+      // One recruit per settlement per turn
+      if (recruitedSettlements.has(settlementId)) {
+        messages.push(`Settlement ${settlementId}: already recruited this turn, skipped`);
+        continue;
+      }
+
+      const unitDef = theme.units.find((u) => u.id === unitDefinitionId);
+      if (!unitDef) {
+        messages.push(`Unit ${unitDefinitionId}: unknown, skipped`);
+        continue;
+      }
+
+      // Check tech prerequisite
+      if (unitDef.prerequisiteTech !== null && !civ.completedTechs.includes(unitDef.prerequisiteTech)) {
+        messages.push(`Unit ${unitDefinitionId}: prereq tech ${unitDef.prerequisiteTech} not completed, skipped`);
+        continue;
+      }
+
+      // Find settlement hex
+      const allHexes = s.map.flat();
+      const settlementHex = allHexes.find(
+        (h) => h.settlement !== null && h.settlement.id === settlementId,
+      );
+      if (!settlementHex) {
+        messages.push(`Settlement ${settlementId}: not found, skipped`);
+        continue;
+      }
+      if (settlementHex.controlledBy !== civId) {
+        messages.push(`Settlement ${settlementId}: not controlled by ${civId}, skipped`);
+        continue;
+      }
+
+      // Check cost
+      const currentDinars = civ.resources['dinars'] ?? 0;
+      if (currentDinars < unitDef.cost) {
+        messages.push(`Unit ${unitDefinitionId}: insufficient dinars (${currentDinars} < ${unitDef.cost}), skipped`);
+        continue;
+      }
+
+      // Spawn unit
+      const unitId = `unit-recruit-${civId}-t${s.turn}-${settlementId}`;
+      const newUnit: Unit = {
+        id: unitId,
+        definitionId: unitDef.id,
+        civilizationId: civId,
+        strength: unitDef.strength,
+        morale: unitDef.morale,
+        movesRemaining: unitDef.moves,
+        isGarrisoned: true,
+      };
+
+      // Place on settlement hex and deduct cost
+      const newMap = s.map.map((row) =>
+        row.map((hex) => {
+          if (hex.settlement !== null && hex.settlement.id === settlementId) {
+            return { ...hex, units: [...hex.units, newUnit] };
+          }
+          return hex;
+        }),
+      );
+
+      s = {
+        ...s,
+        map: newMap,
+        civilizations: {
+          ...s.civilizations,
+          [civId]: {
+            ...civ,
+            resources: {
+              ...civ.resources,
+              dinars: currentDinars - unitDef.cost,
+            },
+          },
+        },
+      };
+
+      recruitedSettlements.add(settlementId);
+      messages.push(`Civ ${civId} recruited ${unitDef.name} at ${settlementHex.settlement!.name} for ${unitDef.cost} dinars`);
+    }
+  }
+
+  return {
+    state: s,
+    log: { phase: 'construction', messages: messages.length > 0 ? messages : ['Recruitment resolved'] },
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Research
 // ---------------------------------------------------------------------------
 
@@ -415,7 +529,7 @@ function checkVictoryDefeat(
   const messages: string[] = [];
   const allHexes = state.map.flat();
   let updatedCivs = { ...state.civilizations };
-  let gamePhase = state.phase;
+  let gamePhase: GamePhase = state.phase;
 
   // Check defeat conditions for each non-eliminated civ
   for (const civId of Object.keys(updatedCivs)) {
@@ -512,9 +626,11 @@ function checkVictoryDefeat(
           break;
         }
         case 'survive_turns': {
-          if (state.turn >= condition.turns) {
+          if (state.turn >= condition.turns && (gamePhase as string) !== 'completed') {
             gamePhase = 'completed';
-            messages.push(`Civ ${civId}: survived ${condition.turns} turns, victory`);
+            // All surviving civs share the victory
+            const winners = survivingCivIds.join(', ');
+            messages.push(`Turn ${condition.turns} reached — surviving civilizations share victory: ${winners}`);
           }
           break;
         }
@@ -530,6 +646,47 @@ function checkVictoryDefeat(
       phase: 'victory_defeat',
       messages: messages.length > 0 ? messages : ['Victory/defeat checked'],
     },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Healing — units on friendly hexes with settlements heal each turn
+// ---------------------------------------------------------------------------
+
+function resolveHealing(
+  state: GameState,
+  theme: ThemePackage,
+): { state: GameState; log: ResolutionLog } {
+  const messages: string[] = [];
+  const newMap = state.map.map((row) =>
+    row.map((hex) => {
+      if (hex.units.length === 0) return hex;
+      if (!hex.settlement || hex.controlledBy === null) return hex;
+
+      const healedUnits = hex.units.map((unit) => {
+        // Only heal units on a friendly settlement hex
+        if (unit.civilizationId !== hex.controlledBy) return unit;
+
+        const unitDef = theme.units.find((u) => u.id === unit.definitionId);
+        if (!unitDef) return unit;
+
+        const maxStrength = unitDef.strength;
+        if (unit.strength >= maxStrength) return unit;
+
+        const newStrength = Math.min(maxStrength, unit.strength + 1);
+        messages.push(
+          `Unit ${unit.id} healed +1 strength at ${hex.settlement!.name} (${newStrength}/${maxStrength})`,
+        );
+        return { ...unit, strength: newStrength };
+      });
+
+      return { ...hex, units: healedUnits };
+    }),
+  );
+
+  return {
+    state: { ...state, map: newMap },
+    log: { phase: 'economy' as ResolutionPhase, messages: messages.length > 0 ? messages : ['Healing resolved'] },
   };
 }
 
@@ -562,6 +719,7 @@ function generateSummary(
   resourcesBefore: Record<string, Record<string, number>>,
   completedTechsBefore: Record<string, string[]>,
   combatResults: CombatResultSummary[],
+  movementMessages: string[],
 ): { state: GameState; log: ResolutionLog; summary: TurnSummary } {
   const summary: TurnSummary = {
     turnNumber: state.turn,
@@ -602,6 +760,14 @@ function generateSummary(
 
       // Narrative lines
       const narrativeLines: string[] = [];
+
+      // Movement messages for this civ
+      for (const msg of movementMessages) {
+        if (msg.includes(civId) || msg.includes(`unit-start-${civId}`) || msg.includes(`unit-recruit-${civId}`)) {
+          narrativeLines.push(msg);
+        }
+      }
+
       for (const [resId, delta] of Object.entries(resourceDeltas)) {
         narrativeLines.push(`${resId}: ${delta > 0 ? '+' : ''}${delta}`);
       }
@@ -651,10 +817,23 @@ export function resolveTurn(
   const logs: ResolutionLog[] = [];
   let s = state;
 
+  // Reset movesRemaining for all units at the start of each turn
+  const unitMovesLookup = new Map(theme.units.map((u) => [u.id, u.moves]));
+  const resetMap = state.map.map((row) =>
+    row.map((hex) => ({
+      ...hex,
+      units: hex.units.map((unit) => ({
+        ...unit,
+        movesRemaining: unitMovesLookup.get(unit.definitionId) ?? unit.movesRemaining,
+      })),
+    })),
+  );
+  s = { ...s, map: resetMap };
+
   // Snapshot resources and completedTechs before any phase (for delta calculation)
   const resourcesBefore: Record<string, Record<string, number>> = {};
   const completedTechsBefore: Record<string, string[]> = {};
-  for (const [civId, civ] of Object.entries(state.civilizations)) {
+  for (const [civId, civ] of Object.entries(s.civilizations)) {
     resourcesBefore[civId] = { ...civ.resources };
     completedTechsBefore[civId] = [...civ.completedTechs];
   }
@@ -693,10 +872,20 @@ export function resolveTurn(
   s = resolveEconomy(s, theme);
   logs.push(logPhase('economy', ['Economy resolved']));
 
+  // Healing (units at friendly settlements recover strength)
+  const healingResult = resolveHealing(s, theme);
+  s = healingResult.state;
+  logs.push(healingResult.log);
+
   // Construction
   const constructionResult = resolveConstruction(s, allOrders, theme);
   s = constructionResult.state;
   logs.push(constructionResult.log);
+
+  // Recruitment
+  const recruitmentResult = resolveRecruitment(s, allOrders, theme);
+  s = recruitmentResult.state;
+  logs.push(recruitmentResult.log);
 
   // Research
   const researchResult = resolveResearch(s, allOrders, theme);
@@ -717,7 +906,7 @@ export function resolveTurn(
   s = victoryResult.state;
   logs.push(victoryResult.log);
 
-  // Summary (with real resource deltas, tech completion, and combat results)
+  // Summary (with real resource deltas, tech completion, combat results, and movement)
   const summaryResult = generateSummary(
     s,
     theme,
@@ -725,6 +914,7 @@ export function resolveTurn(
     resourcesBefore,
     completedTechsBefore,
     combatResults,
+    movementResult.log.messages,
   );
   s = summaryResult.state;
   logs.push(summaryResult.log);

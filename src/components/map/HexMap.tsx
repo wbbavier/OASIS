@@ -14,6 +14,8 @@ const TERRAIN_FILL: Record<TerrainType, string> = {
   river:     '#5898AA',
 };
 
+export { TERRAIN_FILL };
+
 /** Pointy-top hexagon vertices around (cx, cy). */
 function hexPoints(cx: number, cy: number, r: number): string {
   const pts: string[] = [];
@@ -37,6 +39,8 @@ interface HexMapProps {
   currentCivId: string | null;
   /** civId → hex color (from theme) */
   civColors: Record<string, string>;
+  /** civId → display name */
+  civNames?: Record<string, string>;
   onHexClick?: (hex: Hex) => void;
   /** The currently selected hex coord (shows white outline). */
   selectedCoord?: HexCoord | null;
@@ -50,6 +54,7 @@ export function HexMap({
   map,
   currentCivId,
   civColors,
+  civNames,
   onHexClick,
   selectedCoord,
   reachableCoords,
@@ -80,10 +85,33 @@ export function HexMap({
             const isSelected = coordKey === selectedKey;
             const isReachable = reachableSet.has(coordKey);
 
-            // Unique civs with units on this hex (for colored dots)
-            const unitCivIds = visible
-              ? [...new Set(hex.units.map((u) => u.civilizationId))]
-              : [];
+            // Unit counts per civ on this hex
+            const unitCivCounts: Array<{ civId: string; count: number }> = [];
+            if (visible) {
+              const countMap = new Map<string, number>();
+              for (const u of hex.units) {
+                countMap.set(u.civilizationId, (countMap.get(u.civilizationId) ?? 0) + 1);
+              }
+              for (const [cId, count] of countMap) {
+                unitCivCounts.push({ civId: cId, count });
+              }
+            }
+
+            // Build tooltip text
+            const tooltipLines: string[] = [];
+            if (visible) {
+              tooltipLines.push(`Terrain: ${hex.terrain}`);
+              if (hex.settlement) tooltipLines.push(`Settlement: ${hex.settlement.name}`);
+              if (hex.controlledBy) {
+                const name = civNames?.[hex.controlledBy] ?? hex.controlledBy;
+                tooltipLines.push(`Controlled by: ${name}`);
+              }
+              const totalUnits = hex.units.length;
+              if (totalUnits > 0) tooltipLines.push(`Units: ${totalUnits}`);
+            } else {
+              tooltipLines.push('Unexplored');
+            }
+            const tooltipText = tooltipLines.join('\n');
 
             return (
               <g
@@ -91,6 +119,8 @@ export function HexMap({
                 onClick={() => onHexClick?.(hex)}
                 className={onHexClick ? 'cursor-pointer' : undefined}
               >
+                <title>{tooltipText}</title>
+
                 {/* Base terrain hex */}
                 <polygon
                   points={hexPoints(cx, cy, HEX_SIZE - 1)}
@@ -135,23 +165,55 @@ export function HexMap({
                         ★
                       </text>
                     )}
+                    {/* Settlement name label */}
+                    <text
+                      x={cx}
+                      y={cy + (hex.settlement.isCapital ? 14 : 10)}
+                      textAnchor="middle"
+                      fontSize={6}
+                      fill="#ddd"
+                      style={{ pointerEvents: 'none', userSelect: 'none' }}
+                    >
+                      {hex.settlement.name.length > 10
+                        ? hex.settlement.name.slice(0, 9) + '…'
+                        : hex.settlement.name}
+                    </text>
                   </>
                 )}
 
-                {/* Unit dots — one colored dot per unique civ */}
-                {unitCivIds.length > 0 && (
-                  unitCivIds.map((civId, i) => (
-                    <circle
-                      key={civId}
-                      cx={cx + (i - (unitCivIds.length - 1) / 2) * 8}
-                      cy={cy + (hex.settlement ? 12 : 6)}
-                      r={4}
-                      fill={civColors[civId] ?? '#fff'}
-                      stroke="#111"
-                      strokeWidth={0.8}
-                    />
-                  ))
-                )}
+                {/* Unit dots — one colored dot per unique civ, with count badge */}
+                {unitCivCounts.length > 0 &&
+                  unitCivCounts.map(({ civId: uCivId, count }, i) => {
+                    const dotCx = cx + (i - (unitCivCounts.length - 1) / 2) * 10;
+                    const dotCy = cy + (hex.settlement ? 22 : 6);
+                    const dotR = count > 1 ? 6 : 4;
+                    return (
+                      <g key={uCivId}>
+                        <circle
+                          cx={dotCx}
+                          cy={dotCy}
+                          r={dotR}
+                          fill={civColors[uCivId] ?? '#fff'}
+                          stroke="#111"
+                          strokeWidth={0.8}
+                        />
+                        {count > 1 && (
+                          <text
+                            x={dotCx}
+                            y={dotCy + 1}
+                            textAnchor="middle"
+                            dominantBaseline="middle"
+                            fontSize={7}
+                            fill="#111"
+                            fontWeight="bold"
+                            style={{ pointerEvents: 'none' }}
+                          >
+                            {count}
+                          </text>
+                        )}
+                      </g>
+                    );
+                  })}
 
                 {/* Selected hex outline */}
                 {isSelected && (

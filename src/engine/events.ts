@@ -200,6 +200,16 @@ export function resolveEvents(
   let s = state;
   const narrativeLog: string[] = [];
 
+  // Clean up stale resolved events (resolved for 2+ turns or expired)
+  const cleanedEvents = s.activeEvents.filter((e) => {
+    if (!e.resolved) return true;
+    // Keep resolved events for at most 2 turns after resolution
+    if (e.expiresOnTurn !== null && e.expiresOnTurn < s.turn) return false;
+    if (e.activatedOnTurn + 2 < s.turn) return false;
+    return true;
+  });
+  s = { ...s, activeEvents: cleanedEvents };
+
   // Working copy of active events (will be updated below)
   const updatedActiveEvents: ActiveEvent[] = [...s.activeEvents];
 
