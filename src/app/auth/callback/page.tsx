@@ -13,20 +13,51 @@ function CallbackInner() {
     const code = searchParams.get('code');
     const next = searchParams.get('next') ?? '/';
 
-    if (!code) {
-      setError('No code found in URL. The link may have expired.');
+    // PKCE flow: code arrives as a query param
+    if (code) {
+      supabase.auth
+        .exchangeCodeForSession(code)
+        .then(({ error: exchangeError }) => {
+          if (exchangeError) {
+            setError(exchangeError.message);
+          } else {
+            router.replace(next);
+          }
+        });
       return;
     }
 
-    supabase.auth
-      .exchangeCodeForSession(code)
-      .then(({ error: exchangeError }) => {
-        if (exchangeError) {
-          setError(exchangeError.message);
-        } else {
+    // Implicit flow: access_token arrives in the URL hash.
+    // The Supabase client processes the hash automatically on init and fires
+    // onAuthStateChange with SIGNED_IN. We just need to wait for it.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        if (event === 'SIGNED_IN' && session) {
           router.replace(next);
         }
+      }
+    );
+
+    // Fallback: if already signed in (session was in storage), redirect now.
+    supabase.auth.getUser().then(({ data }) => {
+      if (data.user) {
+        router.replace(next);
+      }
+    });
+
+    // If neither fires within 5 s, the link has genuinely expired.
+    const timeout = setTimeout(() => {
+      supabase.auth.getUser().then(({ data }) => {
+        if (!data.user) {
+          setError('No sign-in token found. The link may have expired.');
+        }
       });
+    }, 5000);
+
+    return () => {
+      subscription.unsubscribe();
+      clearTimeout(timeout);
+    };
   }, [searchParams, router]);
 
   if (error) {
