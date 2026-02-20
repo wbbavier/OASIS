@@ -2,6 +2,9 @@
 -- 001_initial_schema.sql
 -- Initial schema for the OASIS civilization simulation game.
 -- All tables use Row Level Security (RLS).
+--
+-- ORDER MATTERS: game_players must be created before the games
+-- RLS policies that reference it (to avoid "relation does not exist").
 -- ============================================================
 
 -- ============================================================
@@ -19,20 +22,17 @@ CREATE TABLE IF NOT EXISTS public.profiles (
 
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 
--- Any authenticated user can read any profile (needed for displaying player names)
 CREATE POLICY "profiles_select_all"
   ON public.profiles FOR SELECT
   TO authenticated
   USING (true);
 
--- Users can only update their own profile
 CREATE POLICY "profiles_update_own"
   ON public.profiles FOR UPDATE
   TO authenticated
   USING (auth.uid() = id)
   WITH CHECK (auth.uid() = id);
 
--- Auto-create profile on sign-up
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -54,8 +54,9 @@ CREATE TRIGGER on_auth_user_created
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
 -- ============================================================
--- GAMES
--- One row per game. game_state is the serialized GameState JSONB.
+-- GAMES (table + insert policy only)
+-- SELECT/UPDATE policies that reference game_players are added
+-- AFTER game_players is created below.
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS public.games (
@@ -72,39 +73,14 @@ CREATE TABLE IF NOT EXISTS public.games (
 
 ALTER TABLE public.games ENABLE ROW LEVEL SECURITY;
 
--- Members of a game can read it
-CREATE POLICY "games_select_members"
-  ON public.games FOR SELECT
-  TO authenticated
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.game_players gp
-      WHERE gp.game_id = games.id
-        AND gp.player_id = auth.uid()
-    )
-  );
-
--- Game creator can insert
 CREATE POLICY "games_insert_creator"
   ON public.games FOR INSERT
   TO authenticated
   WITH CHECK (auth.uid() = created_by);
 
--- Members can update (needed for turn resolution, game state writes)
-CREATE POLICY "games_update_members"
-  ON public.games FOR UPDATE
-  TO authenticated
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.game_players gp
-      WHERE gp.game_id = games.id
-        AND gp.player_id = auth.uid()
-    )
-  );
-
 -- ============================================================
 -- GAME_PLAYERS
--- Join table: which players are in which game, and which civ they control.
+-- Must exist before the games SELECT/UPDATE policies below.
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS public.game_players (
@@ -120,7 +96,6 @@ CREATE TABLE IF NOT EXISTS public.game_players (
 
 ALTER TABLE public.game_players ENABLE ROW LEVEL SECURITY;
 
--- All members of a game can see who else is in the game
 CREATE POLICY "game_players_select_members"
   ON public.game_players FOR SELECT
   TO authenticated
@@ -132,13 +107,11 @@ CREATE POLICY "game_players_select_members"
     )
   );
 
--- A player can insert themselves into a game (joining via invite)
 CREATE POLICY "game_players_insert_self"
   ON public.game_players FOR INSERT
   TO authenticated
   WITH CHECK (auth.uid() = player_id);
 
--- A player can update their own row (e.g., toggle is_ready)
 CREATE POLICY "game_players_update_self"
   ON public.game_players FOR UPDATE
   TO authenticated
@@ -146,8 +119,33 @@ CREATE POLICY "game_players_update_self"
   WITH CHECK (auth.uid() = player_id);
 
 -- ============================================================
+-- GAMES — SELECT / UPDATE policies (safe now that game_players exists)
+-- ============================================================
+
+CREATE POLICY "games_select_members"
+  ON public.games FOR SELECT
+  TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.game_players gp
+      WHERE gp.game_id = games.id
+        AND gp.player_id = auth.uid()
+    )
+  );
+
+CREATE POLICY "games_update_members"
+  ON public.games FOR UPDATE
+  TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.game_players gp
+      WHERE gp.game_id = games.id
+        AND gp.player_id = auth.uid()
+    )
+  );
+
+-- ============================================================
 -- TURN_ORDERS
--- One row per player per turn. Stores the submitted PlayerOrders JSON.
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS public.turn_orders (
@@ -163,7 +161,6 @@ CREATE TABLE IF NOT EXISTS public.turn_orders (
 
 ALTER TABLE public.turn_orders ENABLE ROW LEVEL SECURITY;
 
--- All members of a game can see that orders were submitted (not the content — handled app-side via fog of war)
 CREATE POLICY "turn_orders_select_members"
   ON public.turn_orders FOR SELECT
   TO authenticated
@@ -175,7 +172,6 @@ CREATE POLICY "turn_orders_select_members"
     )
   );
 
--- Players can only insert their own orders
 CREATE POLICY "turn_orders_insert_own"
   ON public.turn_orders FOR INSERT
   TO authenticated
@@ -188,14 +184,12 @@ CREATE POLICY "turn_orders_insert_own"
     )
   );
 
--- Players can update their own orders before resolution
 CREATE POLICY "turn_orders_update_own"
   ON public.turn_orders FOR UPDATE
   TO authenticated
   USING (auth.uid() = player_id)
   WITH CHECK (auth.uid() = player_id);
 
--- Players can delete their own unresolved orders
 CREATE POLICY "turn_orders_delete_own"
   ON public.turn_orders FOR DELETE
   TO authenticated
@@ -203,7 +197,6 @@ CREATE POLICY "turn_orders_delete_own"
 
 -- ============================================================
 -- TURN_HISTORY
--- Resolved turn summaries, one row per turn per game.
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS public.turn_history (
@@ -217,7 +210,6 @@ CREATE TABLE IF NOT EXISTS public.turn_history (
 
 ALTER TABLE public.turn_history ENABLE ROW LEVEL SECURITY;
 
--- All members of a game can read its history
 CREATE POLICY "turn_history_select_members"
   ON public.turn_history FOR SELECT
   TO authenticated
@@ -229,7 +221,6 @@ CREATE POLICY "turn_history_select_members"
     )
   );
 
--- Active members can insert resolved turns (the turn resolver client)
 CREATE POLICY "turn_history_insert_members"
   ON public.turn_history FOR INSERT
   TO authenticated
@@ -243,7 +234,6 @@ CREATE POLICY "turn_history_insert_members"
 
 -- ============================================================
 -- INVITES
--- Short-lived invite codes for joining a game.
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS public.invites (
@@ -260,12 +250,10 @@ CREATE TABLE IF NOT EXISTS public.invites (
 
 ALTER TABLE public.invites ENABLE ROW LEVEL SECURITY;
 
--- Anyone (including unauthenticated) can read invites by code (needed for join-link flow)
 CREATE POLICY "invites_select_all"
   ON public.invites FOR SELECT
   USING (true);
 
--- Game members can create invites for their game
 CREATE POLICY "invites_insert_members"
   ON public.invites FOR INSERT
   TO authenticated
@@ -278,7 +266,6 @@ CREATE POLICY "invites_insert_members"
     )
   );
 
--- Authenticated users can claim an invite (update claimed_by/claimed_at)
 CREATE POLICY "invites_update_claim"
   ON public.invites FOR UPDATE
   TO authenticated
