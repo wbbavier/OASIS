@@ -6,6 +6,12 @@ This is a **weekly turn-based civilization simulation game** playable in a brows
 
 **Claude Code's role:** You are the primary developer. You write all code for this project. Follow this document strictly for architectural decisions, patterns, and conventions.
 
+**Debugging protocol:**
+- `DEBUG_LOG.md` in the repo root is the canonical record of every bug encountered in this project.
+- **Before debugging any error:** read `DEBUG_LOG.md` first — the issue or a related pattern may already be documented.
+- **After fixing any bug:** add a new entry to `DEBUG_LOG.md` using the template at the bottom of that file (symptom, root cause, fix, files changed, rule going forward).
+- Treat the rules in `DEBUG_LOG.md` as hard constraints — never repeat a known anti-pattern.
+
 ---
 
 ## Architecture Rules (Non-Negotiable)

@@ -1,0 +1,106 @@
+# OASIS Debug Log
+
+Running record of bugs, root causes, and fixes encountered during development.
+Claude Code maintains this file and consults it before starting any debug session.
+
+---
+
+## [2026-02-19] Auth callback: "No code found in URL"
+
+**Symptom:** After clicking the magic link, `/auth/callback` showed "No code found in URL. The link may have expired."
+
+**Root cause:** Two compounding issues:
+1. The Supabase client was using **implicit flow** (token in `#hash`) but the callback page only handled **PKCE flow** (`?code=` query param).
+2. The `emailRedirectTo` URL (`/auth/callback`) was not in the Supabase dashboard's allowed redirect list, so Supabase fell back to the site root.
+
+**Fix:**
+- Added `auth: { flowType: 'pkce' }` to `createClient` in `src/lib/supabase.ts` so future links use `?code=`.
+- Updated `/auth/callback` to handle **both flows**: if `?code=` is present use `exchangeCodeForSession`; otherwise listen for `onAuthStateChange` (Supabase auto-processes hash tokens on init) with a 5 s fallback timeout.
+- Added `/auth/callback` to allowed redirect URLs in Supabase dashboard.
+
+**Files changed:** `src/lib/supabase.ts`, `src/app/auth/callback/page.tsx`
+
+---
+
+## [2026-02-19] Migration 001 fails: `relation "public.game_players" does not exist`
+
+**Symptom:** Running `001_initial_schema.sql` in the Supabase SQL editor threw `ERROR 42P01: relation "public.game_players" does not exist`.
+
+**Root cause:** The `games` table's RLS policies (`games_select_members`, `games_update_members`) contain `EXISTS (SELECT 1 FROM public.game_players …)` subqueries. PostgreSQL validates referenced relations **at policy-creation time**, but `game_players` was defined later in the same file.
+
+**Fix:** Reordered `001_initial_schema.sql`:
+1. `profiles` table + policies
+2. `games` table + **insert policy only**
+3. `game_players` table + policies  ← must exist before step 4
+4. `games` SELECT / UPDATE policies (now safe to reference `game_players`)
+5. Remaining tables (`turn_orders`, `turn_history`, `invites`) + their policies
+
+**Files changed:** `supabase/migrations/001_initial_schema.sql`
+
+**Rule going forward:** Never write an RLS policy that references a table defined later in the same migration.
+
+---
+
+## [2026-02-19] Infinite recursion in `game_players` RLS policy
+
+**Symptom:** Loading the game page returned `infinite recursion detected in policy for relation "game_players"`.
+
+**Root cause:** The `game_players_select_members` policy used a self-referencing subquery:
+```sql
+USING (
+  EXISTS (
+    SELECT 1 FROM public.game_players gp2   -- ← same table!
+    WHERE gp2.game_id = game_players.game_id
+      AND gp2.player_id = auth.uid()
+  )
+);
+```
+PostgreSQL enforces the policy on every row access, including the inner `SELECT`, causing infinite recursion.
+
+**Fix:** Dropped `game_players_select_members`. Migration 002 already adds `game_players_select_authenticated` (`USING (true)` for any authenticated user) which covers all legitimate read access without recursion.
+
+**Immediate remediation (SQL editor):**
+```sql
+DROP POLICY IF EXISTS "game_players_select_members" ON public.game_players;
+```
+
+**Files changed:** `supabase/migrations/001_initial_schema.sql`
+
+**Rule going forward:** Never write a SELECT policy on table T that queries table T in its USING clause. Use a `SECURITY DEFINER` function or restructure the policy.
+
+---
+
+## [2026-02-19] Create game fails: foreign key violation on `games.created_by`
+
+**Symptom:** Clicking "Create game" returned `insert or update on table "games" violates foreign key constraint "games_created_by_fkey"`.
+
+**Root cause:** `games.created_by` is a FK → `profiles.id`. The user's account was created **before** the migrations ran, so the `handle_new_user` trigger never fired and no `profiles` row exists for them.
+
+**Fix:** Run the backfill query once after migrations are applied:
+```sql
+INSERT INTO public.profiles (id, username)
+SELECT id, split_part(email, '@', 1)
+FROM auth.users
+ON CONFLICT (id) DO NOTHING;
+```
+This is now included at the bottom of the combined setup script.
+
+**Rule going forward:** Whenever migrations are applied to an existing Supabase project (i.e. users already exist in `auth.users`), always run the backfill. Include it in all "first-time setup" instructions.
+
+---
+
+## Template for new entries
+
+```
+## [YYYY-MM-DD] Short description
+
+**Symptom:** What the user saw / what error message appeared.
+
+**Root cause:** Why it happened.
+
+**Fix:** What was changed, including any SQL to run immediately.
+
+**Files changed:** list of files
+
+**Rule going forward:** What to avoid / check in future.
+```
