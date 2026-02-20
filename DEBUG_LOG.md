@@ -103,6 +103,20 @@ This is now included at the bottom of the combined setup script.
 
 ---
 
+## [2026-02-19] Resolve turn used empty orders instead of stored orders from DB
+
+**Symptom:** Turns resolved successfully but research, construction, and diplomacy orders had no effect — engine processed empty `PlayerOrders` for every player.
+
+**Root cause:** `handleResolve` in `TurnPanel` built `PlayerOrders` by mapping the `submitted` rows (which only contain `player_id` and `civilization_id`) and hard-coded `orders: []`. Actual orders written by `handleSubmit` into `turn_orders.orders` (the full `PlayerOrders` JSONB blob) were never loaded.
+
+**Fix:** In `handleResolve`, replaced the empty-orders map with a Supabase query that fetches all `turn_orders` rows for the current game/turn, selecting `orders`, then casts each row as `PlayerOrders` and passes the full array to `resolveTurn`.
+
+**Files changed:** `src/components/game/TurnPanel.tsx`
+
+**Rule going forward:** Never rebuild `PlayerOrders` from submission metadata rows alone. Always load the full `orders` JSONB column from `turn_orders` when resolving a turn.
+
+---
+
 ## Template for new entries
 
 ```

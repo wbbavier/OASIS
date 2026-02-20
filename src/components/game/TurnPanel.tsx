@@ -1,6 +1,6 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
-import type { GameState, PlayerOrders } from '@/engine/types';
+import type { GameState, PlayerOrders, AnyOrder } from '@/engine/types';
 import type { ThemePackage } from '@/themes/schema';
 import { supabase } from '@/lib/supabase';
 import { resolveTurn } from '@/engine/turn-resolver';
@@ -13,6 +13,10 @@ interface SubmittedRow {
   civilization_id: string;
 }
 
+interface TurnOrderRow {
+  orders: unknown;
+}
+
 interface TurnPanelProps {
   gameId: string;
   gameState: GameState;
@@ -20,6 +24,7 @@ interface TurnPanelProps {
   currentUserId: string;
   currentCivId: string;
   humanPlayerIds: string[];     // all human player_ids in this game
+  pendingOrders: AnyOrder[];    // accumulated orders from OrdersPanel
   onResolved: () => void;       // called after turn resolves so parent can refresh
 }
 
@@ -30,6 +35,7 @@ export function TurnPanel({
   currentUserId,
   currentCivId,
   humanPlayerIds,
+  pendingOrders,
   onResolved,
 }: TurnPanelProps) {
   const [submitted, setSubmitted] = useState<SubmittedRow[]>([]);
@@ -62,7 +68,7 @@ export function TurnPanel({
       playerId: currentUserId,
       civilizationId: currentCivId,
       turnNumber: gameState.turn,
-      orders: [],
+      orders: pendingOrders,
       submittedAt: new Date().toISOString(),
     };
     const { error: upsertError } = await supabase.from('turn_orders').upsert(
@@ -86,13 +92,18 @@ export function TurnPanel({
     try {
       const resolvedAt = new Date().toISOString();
       const prng = createPRNGFromState(gameState.rngState);
-      const submittedOrders: PlayerOrders[] = submitted.map((r) => ({
-        playerId: r.player_id,
-        civilizationId: r.civilization_id,
-        turnNumber: gameState.turn,
-        orders: [],
-        submittedAt: resolvedAt,
-      }));
+
+      // Load actual stored orders from DB instead of building empty ones
+      const { data: orderRows, error: fetchError } = await supabase
+        .from('turn_orders')
+        .select('orders')
+        .eq('game_id', gameId)
+        .eq('turn_number', gameState.turn);
+      if (fetchError) throw new Error(fetchError.message);
+
+      const submittedOrders: PlayerOrders[] = ((orderRows as TurnOrderRow[]) ?? []).map(
+        (r) => r.orders as unknown as PlayerOrders
+      );
 
       const { state: newState } = resolveTurn(gameState, submittedOrders, theme, prng, resolvedAt);
 
@@ -118,6 +129,11 @@ export function TurnPanel({
             {submitted.length}/{humanPlayerIds.length} submitted
           </span>
         </p>
+        {pendingOrders.length > 0 && !alreadySubmitted && (
+          <p className="text-xs text-indigo-400 mt-0.5">
+            {pendingOrders.length} order{pendingOrders.length !== 1 ? 's' : ''} ready to submit
+          </p>
+        )}
         {error && <p className="text-xs text-red-400 mt-0.5">{error}</p>}
       </div>
 
