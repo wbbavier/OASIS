@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
 import type { ThemePackage } from '@/themes/schema';
 import { LobbyRoom } from '@/components/lobby/LobbyRoom';
+import { GameView } from '@/components/game/GameView';
 import { Spinner } from '@/components/ui/Spinner';
 import alRassanTheme from '@/themes/al-rassan/theme.json';
 
@@ -141,22 +142,32 @@ export default function GamePage({ params }: PageProps) {
     );
   }
 
+  // Find this user's civilization
+  const myPlayer = players.find((p) => p.player_id === user.id);
+  if (!myPlayer) {
+    return (
+      <main className="flex min-h-screen flex-col items-center justify-center gap-4 p-8">
+        <p className="text-stone-400">You are not a player in this game.</p>
+        <Link href="/" className="text-sm text-indigo-400 underline">Back to home</Link>
+      </main>
+    );
+  }
+
+  const humanPlayers = players.map((p) => ({
+    playerId: p.player_id,
+    civilizationId: p.civilization_id,
+  }));
+
   return (
-    <main className="mx-auto flex min-h-screen max-w-4xl flex-col gap-8 p-8">
-      <div className="flex items-center justify-between">
-        <div>
-          <Link href="/" className="text-sm text-stone-400 hover:text-stone-200">
-            ← Home
-          </Link>
-          <h1 className="mt-1 text-2xl font-bold text-stone-100">{game.name}</h1>
-        </div>
-        <span className="rounded bg-emerald-800 px-3 py-1 text-sm font-medium text-emerald-200">
-          Active
-        </span>
-      </div>
-      <div className="rounded-xl border border-stone-700 bg-stone-900 p-10 text-center text-stone-400">
-        Game in progress — map coming in Phase 3b
-      </div>
+    <main className="min-h-screen flex flex-col gap-4 p-4 max-w-screen-xl mx-auto">
+      <GameView
+        gameId={game.id}
+        gameName={game.name}
+        theme={theme}
+        currentUserId={user.id}
+        currentCivId={myPlayer.civilization_id}
+        humanPlayers={humanPlayers}
+      />
     </main>
   );
 }
