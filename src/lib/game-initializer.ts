@@ -1,10 +1,10 @@
 // Game state initializer — pure functions, no side effects.
 // Called from the lobby when the creator starts the game.
 
-import type { GameState, CivilizationState, RelationshipState } from '@/engine/types';
+import type { GameState, CivilizationState, RelationshipState, Unit } from '@/engine/types';
 import type { ThemePackage } from '@/themes/schema';
 import { hashSeed, createPRNG } from '@/engine/prng';
-import { generateMap } from '@/engine/map-generator';
+import { generateMap, getNeighbors } from '@/engine/map-generator';
 
 export { hashSeed };
 
@@ -42,7 +42,10 @@ export function initializeGameState(
   createdAt: string
 ): GameState {
   const prng = createPRNG(seed);
-  const map = generateMap(theme.map, prng);
+  const rawMap = generateMap(theme.map, prng);
+
+  // Deep-copy the map so we can place units and initialize fog of war
+  const map = rawMap.map((row) => row.map((hex) => ({ ...hex, units: [...hex.units], exploredBy: [...hex.exploredBy] })));
 
   const playerMap = new Map<string, string | null>(
     playerMappings.map((pm) => [pm.civId, pm.playerId])
@@ -78,6 +81,72 @@ export function initializeGameState(
       isEliminated: false,
       turnsMissingOrders: 0,
     };
+  }
+
+  // Place starting units on each civ's capital and initialize fog of war
+  const mapRows = map.length;
+  const mapCols = map[0]?.length ?? 0;
+
+  for (const civDef of theme.civilizations) {
+    // Find the capital hex for this civ
+    let capitalRow = -1;
+    let capitalCol = -1;
+    outer: for (let r = 0; r < mapRows; r++) {
+      for (let c = 0; c < mapCols; c++) {
+        const h = map[r]?.[c];
+        if (h && h.controlledBy === civDef.id && h.settlement?.isCapital) {
+          capitalRow = r;
+          capitalCol = c;
+          break outer;
+        }
+      }
+    }
+    if (capitalRow === -1) continue;
+
+    // Use the first available unit type that exists in the theme (fallback to a minimal unit)
+    const unitDef = theme.units[0];
+    const startingUnits: Unit[] = unitDef
+      ? [
+          {
+            id: `unit-start-${civDef.id}-1`,
+            definitionId: unitDef.id,
+            civilizationId: civDef.id,
+            strength: unitDef.strength,
+            morale: unitDef.morale,
+            movesRemaining: unitDef.moves,
+            isGarrisoned: true,
+          },
+          {
+            id: `unit-start-${civDef.id}-2`,
+            definitionId: unitDef.id,
+            civilizationId: civDef.id,
+            strength: unitDef.strength,
+            morale: unitDef.morale,
+            movesRemaining: unitDef.moves,
+            isGarrisoned: true,
+          },
+        ]
+      : [];
+
+    const capitalHex = map[capitalRow]?.[capitalCol];
+    if (capitalHex) {
+      map[capitalRow][capitalCol] = { ...capitalHex, units: startingUnits };
+    }
+
+    // Initialize fog of war: mark capital + neighbors as explored by this civ
+    const coordsToExplore = [
+      { col: capitalCol, row: capitalRow },
+      ...getNeighbors({ col: capitalCol, row: capitalRow }, mapCols, mapRows),
+    ];
+    for (const coord of coordsToExplore) {
+      const h = map[coord.row]?.[coord.col];
+      if (h && !h.exploredBy.includes(civDef.id)) {
+        map[coord.row][coord.col] = {
+          ...h,
+          exploredBy: [...h.exploredBy, civDef.id],
+        };
+      }
+    }
   }
 
   return {
