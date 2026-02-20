@@ -166,6 +166,7 @@ export function GameView({
             onHexClick={handleHexClick}
             selectedCoord={selectedCoord}
             reachableCoords={reachableCoords}
+            fogOfWar={gameState.config.fogOfWar}
           />
         </div>
 

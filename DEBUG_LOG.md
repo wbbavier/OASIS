@@ -117,6 +117,24 @@ This is now included at the bottom of the combined setup script.
 
 ---
 
+## [2026-02-20] Map renders all-dark: terrain, settlements, and units invisible
+
+**Symptom:** The hex map rendered as a grid of identical dark gray hexes. No terrain differentiation (plains, mountains, forest, etc.), no settlement markers, no unit dots, and no fog of war distinction. Only a few hexes near the player's capital had colored civ outlines. The map was functionally unreadable.
+
+**Root cause:** `HexMap.tsx` had no `fogOfWar` prop. The visibility check was hardcoded as `currentCivId === null || hex.exploredBy.includes(currentCivId)`. Since the game initializer only marks the capital hex and its 6 neighbors as `exploredBy`, ~95% of hexes evaluated `visible = false`, rendering with fill `#1C1C1C` (dark gray). Terrain colors, settlement markers, and unit dots are all gated behind `visible`, so they were hidden too. Meanwhile, `GameView.tsx` had access to `gameState.config.fogOfWar` (which is `false` for new games) but never passed it to `HexMap`.
+
+**Fix:**
+1. Added `fogOfWar` prop to `HexMap` interface (default `false`)
+2. Changed visibility check to `!fogOfWar || currentCivId === null || hex.exploredBy.includes(currentCivId)`
+3. Passed `fogOfWar={gameState.config.fogOfWar}` from `GameView` to `HexMap`
+4. Removed debug text markers from `GameView.tsx`
+
+**Files changed:** `src/components/map/HexMap.tsx`, `src/components/game/GameView.tsx`
+
+**Rule going forward:** Any rendering gate based on player knowledge (fog of war, visibility) must respect the `config.fogOfWar` flag. When fog is disabled, all hexes must be fully visible. Never hardcode visibility to depend solely on `exploredBy` without checking the fog of war config.
+
+---
+
 ## Template for new entries
 
 ```

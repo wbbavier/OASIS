@@ -42,6 +42,8 @@ interface HexMapProps {
   selectedCoord?: HexCoord | null;
   /** Reachable destination coords (shows green overlay). */
   reachableCoords?: HexCoord[];
+  /** When false, all hexes are visible regardless of exploredBy. */
+  fogOfWar?: boolean;
 }
 
 export function HexMap({
@@ -51,6 +53,7 @@ export function HexMap({
   onHexClick,
   selectedCoord,
   reachableCoords,
+  fogOfWar = false,
 }: HexMapProps) {
   const rows = map.length;
   const cols = rows > 0 ? (map[0]?.length ?? 0) : 0;
@@ -69,7 +72,7 @@ export function HexMap({
             const { col } = hex.coord;
             const [cx, cy] = hexCenter(col, row, HEX_SIZE);
             const visible =
-              currentCivId === null || hex.exploredBy.includes(currentCivId);
+              !fogOfWar || currentCivId === null || hex.exploredBy.includes(currentCivId);
             const baseFill = TERRAIN_FILL[hex.terrain] ?? '#555';
             const fill = visible ? baseFill : '#1C1C1C';
             const controlled = hex.controlledBy && civColors[hex.controlledBy];
