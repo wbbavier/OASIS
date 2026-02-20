@@ -165,7 +165,7 @@ export function initializeGameState(
       turnDeadlineDays: 7,
       allowAIGovernor: true,
       difficultyModifier: 1,
-      fogOfWar: true,
+      fogOfWar: false,
     },
     createdAt,
     lastResolvedAt: null,
