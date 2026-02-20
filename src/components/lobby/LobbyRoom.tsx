@@ -11,7 +11,7 @@ import { Spinner } from '@/components/ui/Spinner';
 
 interface GamePlayer {
   playerId: string;
-  email: string | null;
+  username: string | null;
   civilizationId: string;
 }
 
@@ -43,7 +43,7 @@ export function LobbyRoom({
     const civDef = theme.civilizations.find((c) => c.id === p.civilizationId);
     return {
       playerId: p.playerId,
-      email: p.email,
+      username: p.username,
       civilizationId: p.civilizationId,
       civColor: civDef?.color ?? '#888',
       civName: civDef?.name ?? p.civilizationId,

@@ -5,6 +5,20 @@ Claude Code maintains this file and consults it before starting any debug sessio
 
 ---
 
+## [2026-02-19] Supabase join: `column profiles_1.email does not exist`
+
+**Symptom:** Loading the lobby page threw `column profiles_1.email does not exist`.
+
+**Root cause:** `public.profiles` only stores `id`, `username`, `avatar_url`, `created_at`, `updated_at`. The `email` field lives in `auth.users`, which is not directly joinable via the Supabase JS client. The query `.select('player_id, civilization_id, profiles(email)')` asked PostgREST to select a column that doesn't exist on the joined table.
+
+**Fix:** Changed the select to `profiles(username)` and propagated the rename (`email` → `username`) through `PlayerRow`, `GamePlayer`, `PlayerEntry` interfaces and their render sites in `PlayerList.tsx`.
+
+**Files changed:** `src/app/game/[id]/page.tsx`, `src/components/lobby/LobbyRoom.tsx`, `src/components/lobby/PlayerList.tsx`
+
+**Rule going forward:** Never query `email` via a `profiles(...)` join — it isn't on that table. Use `username` from `profiles`, or `user.email` from the Supabase auth session object (available client-side via `useAuth()`).
+
+---
+
 ## [2026-02-19] Auth callback: "No code found in URL"
 
 **Symptom:** After clicking the magic link, `/auth/callback` showed "No code found in URL. The link may have expired."

@@ -24,7 +24,7 @@ interface GameRow {
 interface PlayerRow {
   player_id: string;
   civilization_id: string;
-  profiles: { email: string | null } | null;
+  profiles: { username: string } | null;
 }
 
 interface PageProps {
@@ -68,7 +68,7 @@ export default function GamePage({ params }: PageProps) {
 
       const { data: playerData, error: playersError } = await supabase
         .from('game_players')
-        .select('player_id, civilization_id, profiles(email)')
+        .select('player_id, civilization_id, profiles(username)')
         .eq('game_id', gameId);
 
       if (playersError) {
@@ -117,7 +117,7 @@ export default function GamePage({ params }: PageProps) {
 
   const playerEntries = players.map((p) => ({
     playerId: p.player_id,
-    email: p.profiles?.email ?? null,
+    username: p.profiles?.username ?? null,
     civilizationId: p.civilization_id,
   }));
 

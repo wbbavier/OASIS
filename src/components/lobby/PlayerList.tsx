@@ -2,7 +2,7 @@ import { Card } from '@/components/ui/Card';
 
 interface PlayerEntry {
   playerId: string | null;
-  email: string | null;
+  username: string | null;
   civilizationId: string;
   civColor: string;
   civName: string;
@@ -30,7 +30,7 @@ export function PlayerList({ players, allCivIds }: PlayerListProps) {
             />
             <span className="text-sm font-medium text-stone-300">{p.civName}</span>
             <span className="ml-auto text-sm text-stone-400">
-              {p.email ?? 'Player'}
+              {p.username ?? 'Player'}
             </span>
           </li>
         ))}
