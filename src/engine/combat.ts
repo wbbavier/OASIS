@@ -202,11 +202,13 @@ export function resolveCombat(
   state: GameState,
   theme: ThemePackage,
   prng: PRNG,
-): GameState {
+): { state: GameState; combatResults: CombatResultSummary[] } {
   // Shallow-copy the map rows and hex objects so we can update units immutably
   const newMap = state.map.map((row) =>
     row.map((hex) => ({ ...hex, units: [...hex.units] })),
   );
+
+  const combatResults: CombatResultSummary[] = [];
 
   for (let row = 0; row < newMap.length; row++) {
     for (let col = 0; col < (newMap[row]?.length ?? 0); col++) {
@@ -254,6 +256,7 @@ export function resolveCombat(
       };
 
       const outcome = resolveCombatEncounter(encounter, theme, prng);
+      combatResults.push(outcome.result);
 
       // Rebuild the hex's unit list: keep unaffected civs, replace combatants
       const unaffected = hex.units.filter(
@@ -271,5 +274,5 @@ export function resolveCombat(
     }
   }
 
-  return { ...state, map: newMap };
+  return { state: { ...state, map: newMap }, combatResults };
 }

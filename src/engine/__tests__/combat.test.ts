@@ -432,7 +432,7 @@ describe('resolveCombat — no combat when hex has only one civ', () => {
     const civA = makeCiv('civ-a');
     const state = makeGameState([[hex]], { 'civ-a': civA });
 
-    const next = resolveCombat(state, theme, createPRNG(42));
+    const { state: next } = resolveCombat(state, theme, createPRNG(42));
     expect(next.map[0][0].units).toHaveLength(1);
     expect(next.map[0][0].units[0].strength).toBe(5);
   });
@@ -449,7 +449,7 @@ describe('resolveCombat — no combat when civs are at peace', () => {
     const civB = makeCiv('civ-b', { 'civ-a': 'peace' });
     const state = makeGameState([[hex]], { 'civ-a': civA, 'civ-b': civB });
 
-    const next = resolveCombat(state, theme, createPRNG(42));
+    const { state: next } = resolveCombat(state, theme, createPRNG(42));
     expect(next.map[0][0].units).toHaveLength(2);
   });
 });
@@ -466,7 +466,7 @@ describe('resolveCombat — combat resolves for civs at war', () => {
     const civB = makeCiv('civ-b', { 'civ-a': 'war' });
     const state = makeGameState([[hex]], { 'civ-a': civA, 'civ-b': civB });
 
-    const next = resolveCombat(state, theme, createPRNG(42));
+    const { state: next } = resolveCombat(state, theme, createPRNG(42));
     const remainingUnits = next.map[0][0].units;
     // civ-b unit (strength 1) should be destroyed after losing
     const civBUnitsLeft = remainingUnits.filter((u) => u.civilizationId === 'civ-b');
@@ -482,8 +482,8 @@ describe('resolveCombat — combat resolves for civs at war', () => {
     const civB = makeCiv('civ-b', { 'civ-a': 'war' });
     const state = makeGameState([[hex]], { 'civ-a': civA, 'civ-b': civB });
 
-    const r1 = resolveCombat(state, theme, createPRNG(100));
-    const r2 = resolveCombat(state, theme, createPRNG(100));
+    const { state: r1 } = resolveCombat(state, theme, createPRNG(100));
+    const { state: r2 } = resolveCombat(state, theme, createPRNG(100));
     expect(r1.map[0][0].units.length).toBe(r2.map[0][0].units.length);
   });
 
@@ -499,7 +499,7 @@ describe('resolveCombat — combat resolves for civs at war', () => {
     const civC = makeCiv('civ-c', { 'civ-b': 'war' });
     const state = makeGameState([[hexContest, hexSafe]], { 'civ-a': civA, 'civ-b': civB, 'civ-c': civC });
 
-    const next = resolveCombat(state, theme, createPRNG(42));
+    const { state: next } = resolveCombat(state, theme, createPRNG(42));
     // Safe hex unchanged
     expect(next.map[0][1].units).toHaveLength(1);
     expect(next.map[0][1].units[0].id).toBe('u1');
@@ -532,7 +532,7 @@ describe('resolveCombat — no-controller hex', () => {
     const civB = makeCiv('civ-b', { 'civ-a': 'war' });
     const state = makeGameState([[hex]], { 'civ-a': civA, 'civ-b': civB });
 
-    const next = resolveCombat(state, theme, createPRNG(42));
+    const { state: next } = resolveCombat(state, theme, createPRNG(42));
     // civ-b (strength 1) attacked civ-a (strength 50) → civ-b should be destroyed
     const civBUnits = next.map[0][0].units.filter((u) => u.civilizationId === 'civ-b');
     expect(civBUnits).toHaveLength(0);

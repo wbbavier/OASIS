@@ -291,19 +291,10 @@ export function resolveEvents(
       // Check trigger condition for this civ
       if (!evaluateTrigger(eventDef.trigger, civ, s)) continue;
 
-      // Activate and immediately auto-resolve with default choice
+      // Activate with resolved: false — effects apply next turn via Step 2 (auto-resolve)
+      // or immediately this turn if the player submits an event_response order.
       instanceCounter += 1;
       const instanceId = `${eventDef.id}-${civId}-${s.turn}-${instanceCounter}`;
-
-      s = applyChoiceEffects(
-        eventDef.defaultChoiceId,
-        eventDef,
-        civId,
-        s,
-        theme,
-        instanceId,
-        narrativeLog,
-      );
 
       const newActiveEvent: ActiveEvent = {
         instanceId,
@@ -312,7 +303,7 @@ export function resolveEvents(
         activatedOnTurn: s.turn,
         expiresOnTurn: null,
         responses: {},
-        resolved: true,
+        resolved: false,
       };
 
       s = { ...s, activeEvents: [...s.activeEvents, newActiveEvent] };

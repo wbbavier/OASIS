@@ -9,6 +9,7 @@ import type {
   ResolutionPhase,
   TurnSummary,
   CivilizationState,
+  CombatResultSummary,
   Hex,
   Unit,
 } from '@/engine/types';
@@ -533,6 +534,24 @@ function checkVictoryDefeat(
 }
 
 // ---------------------------------------------------------------------------
+// Control transfer — after combat, sole occupant claims the hex
+// ---------------------------------------------------------------------------
+
+function resolveControlTransfer(state: GameState): GameState {
+  const newMap = state.map.map((row) =>
+    row.map((hex) => {
+      if (hex.units.length === 0) return hex;
+      const civIds = [...new Set(hex.units.map((u) => u.civilizationId))];
+      if (civIds.length !== 1) return hex; // contested — no transfer
+      const sole = civIds[0]!;
+      if (sole === hex.controlledBy) return hex; // already controlled
+      return { ...hex, controlledBy: sole };
+    }),
+  );
+  return { ...state, map: newMap };
+}
+
+// ---------------------------------------------------------------------------
 // Summary generation
 // ---------------------------------------------------------------------------
 
@@ -540,19 +559,75 @@ function generateSummary(
   state: GameState,
   _theme: ThemePackage,
   resolvedAt: string,
+  resourcesBefore: Record<string, Record<string, number>>,
+  completedTechsBefore: Record<string, string[]>,
+  combatResults: CombatResultSummary[],
 ): { state: GameState; log: ResolutionLog; summary: TurnSummary } {
   const summary: TurnSummary = {
     turnNumber: state.turn,
     resolvedAt,
-    entries: Object.keys(state.civilizations).map((civId) => ({
-      civId,
-      narrativeLines: [`Turn ${state.turn} complete.`],
-      resourceDeltas: {},
-      eventsActivated: [],
-      combatResults: [],
-      techCompleted: null,
-      eliminated: state.civilizations[civId].isEliminated,
-    })),
+    entries: Object.keys(state.civilizations).map((civId) => {
+      const civ = state.civilizations[civId];
+      const before = resourcesBefore[civId] ?? {};
+      const techsBefore = completedTechsBefore[civId] ?? [];
+
+      // Resource deltas
+      const resourceDeltas: Record<string, number> = {};
+      const allResourceIds = new Set([
+        ...Object.keys(before),
+        ...Object.keys(civ.resources),
+      ]);
+      for (const resId of allResourceIds) {
+        const delta = (civ.resources[resId] ?? 0) - (before[resId] ?? 0);
+        if (delta !== 0) resourceDeltas[resId] = delta;
+      }
+
+      // Tech completed this turn
+      const newTechs = civ.completedTechs.filter((t) => !techsBefore.includes(t));
+      const techCompleted = newTechs.length > 0 ? (newTechs[0] ?? null) : null;
+
+      // Combat results involving this civ
+      const civCombatResults = combatResults.filter(
+        (r) => r.attackerCivId === civId || r.defenderCivId === civId,
+      );
+
+      // Events activated this turn for this civ
+      const eventsActivated = state.activeEvents
+        .filter(
+          (e) =>
+            e.targetCivilizationIds.includes(civId) &&
+            e.activatedOnTurn === state.turn,
+        )
+        .map((e) => e.definitionId);
+
+      // Narrative lines
+      const narrativeLines: string[] = [];
+      for (const [resId, delta] of Object.entries(resourceDeltas)) {
+        narrativeLines.push(`${resId}: ${delta > 0 ? '+' : ''}${delta}`);
+      }
+      if (techCompleted) {
+        narrativeLines.push(`Research complete: ${techCompleted}`);
+      }
+      for (const combat of civCombatResults) {
+        const role = combat.attackerCivId === civId ? 'attacker' : 'defender';
+        narrativeLines.push(
+          `Combat at (${combat.coord.col},${combat.coord.row}): ${combat.outcome} (as ${role})`,
+        );
+      }
+      if (narrativeLines.length === 0) {
+        narrativeLines.push(`Turn ${state.turn} complete.`);
+      }
+
+      return {
+        civId,
+        narrativeLines,
+        resourceDeltas,
+        eventsActivated,
+        combatResults: civCombatResults,
+        techCompleted,
+        eliminated: civ.isEliminated,
+      };
+    }),
   };
 
   return {
@@ -575,6 +650,14 @@ export function resolveTurn(
 ): TurnResolutionResult {
   const logs: ResolutionLog[] = [];
   let s = state;
+
+  // Snapshot resources and completedTechs before any phase (for delta calculation)
+  const resourcesBefore: Record<string, Record<string, number>> = {};
+  const completedTechsBefore: Record<string, string[]> = {};
+  for (const [civId, civ] of Object.entries(state.civilizations)) {
+    resourcesBefore[civId] = { ...civ.resources };
+    completedTechsBefore[civId] = [...civ.completedTechs];
+  }
 
   // Fill missing orders with AI (pass resolvedAt instead of new Date())
   const allOrders = fillMissingOrdersWithAI(s, submittedOrders, theme, prng.fork(), resolvedAt);
@@ -599,8 +682,12 @@ export function resolveTurn(
   logs.push(movementResult.log);
 
   // Combat
-  s = resolveCombat(s, theme, prng.fork());
+  const { state: stateAfterCombat, combatResults } = resolveCombat(s, theme, prng.fork());
+  s = stateAfterCombat;
   logs.push(logPhase('combat', ['Combat resolved']));
+
+  // Control transfer — sole occupant claims the hex
+  s = resolveControlTransfer(s);
 
   // Economy
   s = resolveEconomy(s, theme);
@@ -630,8 +717,15 @@ export function resolveTurn(
   s = victoryResult.state;
   logs.push(victoryResult.log);
 
-  // Summary
-  const summaryResult = generateSummary(s, theme, resolvedAt);
+  // Summary (with real resource deltas, tech completion, and combat results)
+  const summaryResult = generateSummary(
+    s,
+    theme,
+    resolvedAt,
+    resourcesBefore,
+    completedTechsBefore,
+    combatResults,
+  );
   s = summaryResult.state;
   logs.push(summaryResult.log);
 

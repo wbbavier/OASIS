@@ -241,6 +241,20 @@ describe('evaluateTrigger — always', () => {
 // resolveEvents — effect application
 // ---------------------------------------------------------------------------
 
+// Helper: make a pre-existing unresolved event (activatedOnTurn: 0 so Step 2 processes it at turn 1)
+function makeStaleEvent(overrides: Partial<ActiveEvent> = {}): ActiveEvent {
+  return {
+    instanceId: 'stale-pre-existing',
+    definitionId: 'test-event',
+    targetCivilizationIds: ['civ-a'],
+    activatedOnTurn: 0,
+    expiresOnTurn: null,
+    responses: {},
+    resolved: false,
+    ...overrides,
+  };
+}
+
 describe('resolveEvents — resource_delta effect', () => {
   it('adds delta to resource', () => {
     const eventDef = makeEventDef({
@@ -248,8 +262,10 @@ describe('resolveEvents — resource_delta effect', () => {
       targetCivs: 'all',
       choices: [{ id: 'default', label: 'Ok', effects: [{ kind: 'resource_delta', resourceId: 'grain', delta: 5 }] }],
     });
-    const state = makeState({ 'civ-a': makeCiv('civ-a', { resources: { grain: 10 } }) });
-    const result = resolveEvents(state, NO_ORDERS, makeTheme([eventDef]), PRNG);
+    // Pre-existing unresolved event; Step 2 auto-resolves it this turn
+    const state = makeState({ 'civ-a': makeCiv('civ-a', { resources: { grain: 10 } }) }, 1);
+    const stateWithEvent = { ...state, activeEvents: [makeStaleEvent()] };
+    const result = resolveEvents(stateWithEvent, NO_ORDERS, makeTheme([eventDef]), PRNG);
     expect(result.civilizations['civ-a'].resources['grain']).toBe(15);
   });
 
@@ -258,8 +274,9 @@ describe('resolveEvents — resource_delta effect', () => {
       trigger: { kind: 'always' },
       choices: [{ id: 'default', label: 'Ok', effects: [{ kind: 'resource_delta', resourceId: 'grain', delta: -100 }] }],
     });
-    const state = makeState({ 'civ-a': makeCiv('civ-a', { resources: { grain: 10 } }) });
-    const result = resolveEvents(state, NO_ORDERS, makeTheme([eventDef]), PRNG);
+    const state = makeState({ 'civ-a': makeCiv('civ-a', { resources: { grain: 10 } }) }, 1);
+    const stateWithEvent = { ...state, activeEvents: [makeStaleEvent()] };
+    const result = resolveEvents(stateWithEvent, NO_ORDERS, makeTheme([eventDef]), PRNG);
     expect(result.civilizations['civ-a'].resources['grain']).toBe(0);
   });
 });
@@ -269,8 +286,9 @@ describe('resolveEvents — stability_delta effect', () => {
     const eventDef = makeEventDef({
       choices: [{ id: 'default', label: 'Ok', effects: [{ kind: 'stability_delta', delta: 50 }] }],
     });
-    const state = makeState({ 'civ-a': makeCiv('civ-a', { stability: 90 }) });
-    const result = resolveEvents(state, NO_ORDERS, makeTheme([eventDef]), PRNG);
+    const state = makeState({ 'civ-a': makeCiv('civ-a', { stability: 90 }) }, 1);
+    const stateWithEvent = { ...state, activeEvents: [makeStaleEvent()] };
+    const result = resolveEvents(stateWithEvent, NO_ORDERS, makeTheme([eventDef]), PRNG);
     expect(result.civilizations['civ-a'].stability).toBe(100);
   });
 });
@@ -280,8 +298,9 @@ describe('resolveEvents — tension_delta effect', () => {
     const eventDef = makeEventDef({
       choices: [{ id: 'default', label: 'Ok', effects: [{ kind: 'tension_delta', axis: 'religious_fervor', delta: 50 }] }],
     });
-    const state = makeState({ 'civ-a': makeCiv('civ-a', { tensionAxes: { religious_fervor: 80 } }) });
-    const result = resolveEvents(state, NO_ORDERS, makeTheme([eventDef]), PRNG);
+    const state = makeState({ 'civ-a': makeCiv('civ-a', { tensionAxes: { religious_fervor: 80 } }) }, 1);
+    const stateWithEvent = { ...state, activeEvents: [makeStaleEvent()] };
+    const result = resolveEvents(stateWithEvent, NO_ORDERS, makeTheme([eventDef]), PRNG);
     expect(result.civilizations['civ-a'].tensionAxes['religious_fervor']).toBe(100);
   });
 
@@ -289,8 +308,9 @@ describe('resolveEvents — tension_delta effect', () => {
     const eventDef = makeEventDef({
       choices: [{ id: 'default', label: 'Ok', effects: [{ kind: 'tension_delta', axis: 'unknown_axis', delta: -200 }] }],
     });
-    const state = makeState({ 'civ-a': makeCiv('civ-a', { tensionAxes: { unknown_axis: 50 } }) });
-    const result = resolveEvents(state, NO_ORDERS, makeTheme([eventDef]), PRNG);
+    const state = makeState({ 'civ-a': makeCiv('civ-a', { tensionAxes: { unknown_axis: 50 } }) }, 1);
+    const stateWithEvent = { ...state, activeEvents: [makeStaleEvent()] };
+    const result = resolveEvents(stateWithEvent, NO_ORDERS, makeTheme([eventDef]), PRNG);
     expect(result.civilizations['civ-a'].tensionAxes['unknown_axis']).toBe(0);
   });
 });
@@ -306,11 +326,15 @@ describe('resolveEvents — force_war effect', () => {
         },
       ],
     });
-    const state = makeState({
-      'civ-a': makeCiv('civ-a', { diplomaticRelations: { 'civ-b': 'peace' } }),
-      'civ-b': makeCiv('civ-b', { diplomaticRelations: { 'civ-a': 'peace' } }),
-    });
-    const result = resolveEvents(state, NO_ORDERS, makeTheme([eventDef]), PRNG);
+    const state = makeState(
+      {
+        'civ-a': makeCiv('civ-a', { diplomaticRelations: { 'civ-b': 'peace' } }),
+        'civ-b': makeCiv('civ-b', { diplomaticRelations: { 'civ-a': 'peace' } }),
+      },
+      1,
+    );
+    const stateWithEvent = { ...state, activeEvents: [makeStaleEvent()] };
+    const result = resolveEvents(stateWithEvent, NO_ORDERS, makeTheme([eventDef]), PRNG);
     expect(result.civilizations['civ-a'].diplomaticRelations['civ-b']).toBe('war');
     expect(result.civilizations['civ-b'].diplomaticRelations['civ-a']).toBe('war');
   });
@@ -358,7 +382,7 @@ describe('resolveEvents — event activation', () => {
     const result = resolveEvents(state, NO_ORDERS, makeTheme([eventDef]), PRNG);
     expect(result.activeEvents.length).toBeGreaterThan(0);
     expect(result.activeEvents[0].definitionId).toBe('test-event');
-    expect(result.activeEvents[0].resolved).toBe(true);
+    expect(result.activeEvents[0].resolved).toBe(false);
   });
 
   it('does not activate event when trigger is false', () => {
