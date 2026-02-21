@@ -166,7 +166,12 @@ export function GameView({
 
       {/* Last turn summary */}
       {lastSummary && civ && (
-        <TurnSummaryPanel summary={lastSummary} civId={currentCivId} theme={theme} />
+        <TurnSummaryPanel
+          summary={lastSummary}
+          civId={currentCivId}
+          theme={theme}
+          allSummaries={gameState.turnHistory}
+        />
       )}
 
       {/* Map + sidebar layout */}
