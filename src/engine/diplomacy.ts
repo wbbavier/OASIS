@@ -7,9 +7,43 @@ import type {
   PlayerOrders,
   RelationshipState,
   CivilizationState,
+  DiplomaticMessage,
 } from '@/engine/types';
 import type { DiplomaticActionType } from '@/engine/types';
 import type { ThemePackage } from '@/themes/schema';
+
+// ---------------------------------------------------------------------------
+// Tech gate check — unlock_diplomacy_action
+// ---------------------------------------------------------------------------
+
+function civHasDiplomacyActionUnlocked(
+  civId: string,
+  actionType: DiplomaticActionType,
+  state: GameState,
+  theme: ThemePackage,
+): boolean {
+  // Check if any tech has unlock_diplomacy_action for this action type
+  const requiresTech = theme.techTree.some((t) =>
+    t.effects.some(
+      (e) => e.kind === 'custom' && e.key === 'unlock_diplomacy_action' && e.value === actionType,
+    ),
+  );
+  if (!requiresTech) return true; // no tech gates this action
+
+  // Check if the civ has completed a tech that unlocks it
+  const civ = state.civilizations[civId];
+  if (!civ) return false;
+  for (const techId of civ.completedTechs) {
+    const techDef = theme.techTree.find((t) => t.id === techId);
+    if (!techDef) continue;
+    for (const effect of techDef.effects) {
+      if (effect.kind === 'custom' && effect.key === 'unlock_diplomacy_action' && effect.value === actionType) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -58,19 +92,26 @@ function applyStabilityPenalty(
 // Main diplomacy resolution
 // ---------------------------------------------------------------------------
 
+export interface DiplomacyResult {
+  state: GameState;
+  diplomaticMessages: DiplomaticMessage[];
+}
+
 export function resolveDiplomacy(
   state: GameState,
   orders: PlayerOrders[],
   theme: ThemePackage,
-): GameState {
+): DiplomacyResult {
   void theme;
   let civs = { ...state.civilizations };
+  const diplomaticMessages: DiplomaticMessage[] = [];
 
   // Collect all proposals so we can check for mutual ones
   const proposals: Array<{
     source: string;
     target: string;
     actionType: DiplomaticActionType;
+    payload: Record<string, unknown>;
   }> = [];
 
   for (const playerOrders of orders) {
@@ -83,6 +124,7 @@ export function resolveDiplomacy(
         source: sourceCivId,
         target: order.targetCivId,
         actionType: order.actionType,
+        payload: order.payload,
       });
     }
   }
@@ -91,6 +133,9 @@ export function resolveDiplomacy(
   for (const proposal of proposals) {
     const { source, target, actionType } = proposal;
     if (!civs[target]) continue;
+
+    // Tech gate check: skip action if civ hasn't unlocked it
+    if (!civHasDiplomacyActionUnlocked(source, actionType, state, theme)) continue;
 
     switch (actionType) {
       case 'declare_war': {
@@ -121,8 +166,22 @@ export function resolveDiplomacy(
         break;
       }
 
-      // send_message, offer_trade — no relation change
-      case 'send_message':
+      // send_message — collect message for delivery
+      case 'send_message': {
+        const msgText = typeof proposal.payload?.message === 'string'
+          ? proposal.payload.message
+          : '';
+        if (msgText.length > 0) {
+          diplomaticMessages.push({
+            fromCivId: source,
+            toCivId: target,
+            message: msgText,
+          });
+        }
+        break;
+      }
+
+      // offer_trade — no relation change
       case 'offer_trade':
         break;
 
@@ -157,5 +216,5 @@ export function resolveDiplomacy(
     }
   }
 
-  return { ...state, civilizations: civs };
+  return { state: { ...state, civilizations: civs }, diplomaticMessages };
 }

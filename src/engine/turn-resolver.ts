@@ -158,6 +158,16 @@ function resolveMovement(
         continue;
       }
 
+      // Max unit stack check
+      const baseMaxStack = 6;
+      const stackBonus = getCustomTechEffectValue(state, civId, 'max_unit_stack', _theme);
+      const maxStack = baseMaxStack + stackBonus;
+      const destUnits = newMap[destRow][destCol].units.filter((u) => u.civilizationId === civId);
+      if (destUnits.length >= maxStack) {
+        messages.push(`Unit ${unitId}: destination stack full (${destUnits.length}/${maxStack}), skipped`);
+        continue;
+      }
+
       const sourceCoord = { ...newMap[srcRow][srcCol].coord };
 
       // Remove from source
@@ -988,6 +998,13 @@ function resolveHealing(
   theme: ThemePackage,
 ): { state: GameState; log: ResolutionLog } {
   const messages: string[] = [];
+  // Pre-compute unit_heal_rate bonus per civ
+  const healRateByCiv = new Map<string, number>();
+  for (const civId of Object.keys(state.civilizations)) {
+    const bonus = getCustomTechEffectValue(state, civId, 'unit_heal_rate', theme);
+    if (bonus !== 0) healRateByCiv.set(civId, bonus);
+  }
+
   const newMap = state.map.map((row) =>
     row.map((hex) => {
       if (hex.units.length === 0) return hex;
@@ -1003,9 +1020,11 @@ function resolveHealing(
         const maxStrength = unitDef.strength;
         if (unit.strength >= maxStrength) return unit;
 
-        const newStrength = Math.min(maxStrength, unit.strength + 1);
+        const baseHeal = 1;
+        const techHealBonus = healRateByCiv.get(unit.civilizationId) ?? 0;
+        const newStrength = Math.min(maxStrength, unit.strength + baseHeal + techHealBonus);
         messages.push(
-          `Unit ${unit.id} healed +1 strength at ${hex.settlement!.name} (${newStrength}/${maxStrength})`,
+          `Unit ${unit.id} healed +${baseHeal + techHealBonus} strength at ${hex.settlement!.name} (${newStrength}/${maxStrength})`,
         );
         return { ...unit, strength: newStrength };
       });
@@ -1268,6 +1287,21 @@ export function resolveTurn(
   s = resolveEconomy(s, theme);
   logs.push(logPhase('economy', ['Economy resolved']));
 
+  // Cultural victory progress — add tech effect value to faith per turn
+  for (const civId of Object.keys(s.civilizations)) {
+    const cvp = getCustomTechEffectValue(s, civId, 'cultural_victory_progress', theme);
+    if (cvp > 0) {
+      const civ = s.civilizations[civId];
+      s = {
+        ...s,
+        civilizations: {
+          ...s.civilizations,
+          [civId]: { ...civ, resources: { ...civ.resources, faith: (civ.resources['faith'] ?? 0) + cvp } },
+        },
+      };
+    }
+  }
+
   // Healing (units at friendly settlements recover strength)
   const healingResult = resolveHealing(s, theme);
   s = healingResult.state;
@@ -1287,6 +1321,47 @@ export function resolveTurn(
   const researchResult = resolveResearch(s, allOrders, theme);
   s = researchResult.state;
   logs.push(researchResult.log);
+
+  // Trigger events from tech completions (trigger_event custom effect)
+  for (const [civId, civ] of Object.entries(s.civilizations)) {
+    const before = completedTechsBefore[civId] ?? [];
+    for (const techId of civ.completedTechs) {
+      if (before.includes(techId)) continue;
+      const techDef = theme.techTree.find((t) => t.id === techId);
+      if (!techDef) continue;
+      for (const effect of techDef.effects) {
+        if (effect.kind === 'custom' && effect.key === 'trigger_event' && typeof effect.value === 'string') {
+          const eventDef = theme.events.find((e) => e.id === effect.value);
+          if (eventDef) {
+            const instanceId = `${eventDef.id}-trigger-${civId}-${s.turn}`;
+            const alreadyActive = s.activeEvents.some((e) => e.instanceId === instanceId);
+            if (!alreadyActive) {
+              const targetCivIds = eventDef.targetCivs === 'all'
+                ? Object.keys(s.civilizations).filter((id) => !s.civilizations[id].isEliminated)
+                : eventDef.targetCivs === 'random_one'
+                ? [civId]
+                : (eventDef.targetCivs as string[]);
+              s = {
+                ...s,
+                activeEvents: [
+                  ...s.activeEvents,
+                  {
+                    instanceId,
+                    definitionId: eventDef.id,
+                    targetCivilizationIds: targetCivIds,
+                    activatedOnTurn: s.turn,
+                    expiresOnTurn: null,
+                    responses: {},
+                    resolved: false,
+                  },
+                ],
+              };
+            }
+          }
+        }
+      }
+    }
+  }
 
   // Events (pass allOrders so event responses can be processed)
   s = resolveEvents(s, allOrders, theme, prng.fork());

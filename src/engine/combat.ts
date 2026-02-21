@@ -13,6 +13,7 @@ import type {
 } from '@/engine/types';
 import type { ThemePackage } from '@/themes/schema';
 import { getNeighbors } from '@/engine/map-generator';
+import { getCustomTechEffectValue } from '@/engine/economy';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -275,11 +276,51 @@ export function resolveCombatEncounter(
   prng: PRNG,
 ): CombatOutcome {
   // Tech bonuses
-  const attackerTechBonus = getTechCombatBonus(state, encounter.attackerCivId, theme);
-  const defenderTechBonus = getTechCombatBonus(state, encounter.defenderCivId, theme);
+  let attackerTechBonus = getTechCombatBonus(state, encounter.attackerCivId, theme);
+  let defenderTechBonus = getTechCombatBonus(state, encounter.defenderCivId, theme);
+
+  // Custom tech effect: siege_combat_bonus — attacker bonus when battle hex has a settlement
+  const hexHasSettlement = state.map.flat().some(
+    (h) => h.coord.col === encounter.coord.col && h.coord.row === encounter.coord.row && h.settlement !== null,
+  );
+  if (hexHasSettlement) {
+    attackerTechBonus += getCustomTechEffectValue(state, encounter.attackerCivId, 'siege_combat_bonus', theme);
+  }
+
+  // Custom tech effect: cavalry_combat_bonus — bonus when force has cavalry units
+  const cavalryPattern = /cavalry|horseman|knight|rider/i;
+  const attackerHasCavalry = encounter.attackerUnits.some((u) => {
+    const unitDef = theme.units.find((d) => d.id === u.definitionId);
+    return unitDef && cavalryPattern.test(unitDef.name);
+  });
+  if (attackerHasCavalry) {
+    attackerTechBonus += getCustomTechEffectValue(state, encounter.attackerCivId, 'cavalry_combat_bonus', theme);
+  }
+  const defenderHasCavalry = encounter.defenderUnits.some((u) => {
+    const unitDef = theme.units.find((d) => d.id === u.definitionId);
+    return unitDef && cavalryPattern.test(unitDef.name);
+  });
+  if (defenderHasCavalry) {
+    defenderTechBonus += getCustomTechEffectValue(state, encounter.defenderCivId, 'cavalry_combat_bonus', theme);
+  }
+
+  // Custom tech effect: capital_defense_combat_bonus — defender bonus when defending on capital hex
+  const defenderCapitalCoord = findCapitalCoord(state.map, encounter.defenderCivId);
+  if (
+    defenderCapitalCoord &&
+    defenderCapitalCoord.col === encounter.coord.col &&
+    defenderCapitalCoord.row === encounter.coord.row
+  ) {
+    defenderTechBonus += getCustomTechEffectValue(state, encounter.defenderCivId, 'capital_defense_combat_bonus', theme);
+  }
 
   // Seasonal modifier (additive, same for both sides)
   const seasonalMod = getSeasonCombatModifier(state, theme);
+
+  // Custom tech effect: settlement_defense_bonus — defender bonus on settlement hexes
+  if (hexHasSettlement) {
+    defenderTechBonus += getCustomTechEffectValue(state, encounter.defenderCivId, 'settlement_defense_bonus', theme);
+  }
 
   // Civ special abilities
   const attackerCivDef = theme.civilizations.find((c) => c.id === encounter.attackerCivId);
@@ -290,6 +331,19 @@ export function resolveCombatEncounter(
   const defenderAbilityBonus = parseCivCombatAbilities(
     defenderCivDef?.specialAbilities ?? [], false, encounter.terrain,
   );
+
+  // Civ ability: Reconquista Drive — attack bonus vs different religion
+  if (attackerCivDef && defenderCivDef) {
+    for (const ability of attackerCivDef.specialAbilities) {
+      const reconquistaMatch = ability.match(/Units get \+(\d+) combat strength when attacking.*different.religion/i);
+      // Also match "Gain +N faith when capturing Asharite settlements" pattern as combat boost
+      if (reconquistaMatch) {
+        if (attackerCivDef.religion && defenderCivDef.religion && attackerCivDef.religion !== defenderCivDef.religion) {
+          attackerTechBonus += parseInt(reconquistaMatch[1], 10);
+        }
+      }
+    }
+  }
 
   const attackerPower = calculateEffectivePower(
     encounter.attackerUnits, encounter.terrain, false, theme,

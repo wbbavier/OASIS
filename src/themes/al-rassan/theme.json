@@ -22,7 +22,7 @@
       "uniqueUnits": [],
       "uniqueBuildings": ["library", "observatory"],
       "specialAbilities": [
-        "Cultural Patronage: Gain +10% faith when constructing cultural buildings",
+        "Cultural Patronage: Culture buildings produce +50% culture",
         "City of Scholars: Libraries cost 10 dinars less to build"
       ],
       "flavor": "The city of Ragosa shines gold in the afternoon light, its minarets and counting-houses rising above the river. Here the poets compose, the physicians study, and the Kindath trade in peace. It cannot last."
@@ -46,7 +46,8 @@
       "uniqueBuildings": [],
       "specialAbilities": [
         "Aggressive Expansion: Units gain +5 combat strength when attacking",
-        "City of Swords: Barracks cost 10 dinars less to build"
+        "City of Swords: Barracks cost 10 dinars less to build",
+        "Merchant Cavalry: Cavalry units generate +2 dinars in settlements with a market"
       ],
       "flavor": "Cartada's banner is the red sword on black. Its Emir has unified the western Asharite cities through conquest and fear. His ambitions do not stop at the borders of Al Rassan."
     },
@@ -68,7 +69,7 @@
       "uniqueUnits": ["knight-commander"],
       "uniqueBuildings": [],
       "specialAbilities": [
-        "Reconquista Drive: Gain +10 faith when capturing Asharite settlements",
+        "Reconquista Drive: Units get +10 combat strength when attacking different religion",
         "Mountain Fortress: Units defending in mountains gain +10 combat strength"
       ],
       "flavor": "The kings of Valledo kneel before the disk of Jad and rise with fire in their eyes. They speak of reclaiming the peninsula. They are no longer speaking only in prayers."
@@ -91,7 +92,7 @@
       "uniqueUnits": ["war-galley"],
       "uniqueBuildings": ["port"],
       "specialAbilities": [
-        "Merchant Cavalry: Trade route income is boosted when horses are plentiful",
+        "Silver Road: Settlements connected to capital get +3 trade_goods per turn",
         "Sea Traders: Ports generate +2 extra trade_goods per turn"
       ],
       "flavor": "Ruenda sits astride the coastal road and grows rich from it. Its king is practical: alliances are tools, wars are expenses, and the sea is an opportunity."

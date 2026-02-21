@@ -4,6 +4,7 @@
 
 import type { GameState, Hex, Unit, CivilizationState } from '@/engine/types';
 import type { ThemePackage, TurnCycleEffect, ResourceDefinition, TechEffect } from '@/themes/schema';
+import { getNeighbors } from '@/engine/map-generator';
 
 // ---------------------------------------------------------------------------
 // Seasonal cycle
@@ -213,6 +214,35 @@ export function getTechStabilityBonus(
 }
 
 // ---------------------------------------------------------------------------
+// Custom tech effect helper
+// ---------------------------------------------------------------------------
+
+/**
+ * Scan a civ's completed techs for `kind: 'custom'` effects matching a given key.
+ * Returns the sum of all matching effect values (cast to number, defaulting to 0).
+ */
+export function getCustomTechEffectValue(
+  state: GameState,
+  civId: string,
+  key: string,
+  theme: ThemePackage,
+): number {
+  const civ = state.civilizations[civId];
+  if (!civ) return 0;
+  let total = 0;
+  for (const techId of civ.completedTechs) {
+    const techDef = theme.techTree.find((t) => t.id === techId);
+    if (!techDef) continue;
+    for (const effect of techDef.effects) {
+      if (effect.kind === 'custom' && effect.key === key) {
+        total += typeof effect.value === 'number' ? effect.value : 0;
+      }
+    }
+  }
+  return total;
+}
+
+// ---------------------------------------------------------------------------
 // Main economy resolution
 // ---------------------------------------------------------------------------
 
@@ -272,11 +302,143 @@ export function resolveEconomy(state: GameState, theme: ThemePackage): GameState
         const { resourceDeltas, stabilityDelta: bStab, upkeepCost } =
           calculateBuildingEffects(hex.settlement.buildings, theme);
 
+        // Civ ability: Cultural Patronage — culture buildings produce +X% culture (faith)
+        const civDefForBuildings = theme.civilizations.find((c) => c.id === civId);
+        if (civDefForBuildings) {
+          for (const ability of civDefForBuildings.specialAbilities) {
+            const patronageMatch = ability.match(/Culture buildings produce \+(\d+)% culture/i);
+            const faithGainMatch = ability.match(/Gain \+(\d+)% faith when constructing cultural buildings/i);
+            const match = patronageMatch ?? faithGainMatch;
+            if (match) {
+              const multiplier = 1 + parseInt(match[1], 10) / 100;
+              // Check if any buildings in this settlement are "cultural" (library, observatory, mosque, cathedral)
+              const culturalPattern = /library|observatory|mosque|cathedral/i;
+              for (const buildingId of hex.settlement.buildings) {
+                const bDef = theme.buildings.find((b) => b.id === buildingId);
+                if (bDef && culturalPattern.test(bDef.name)) {
+                  // Multiply faith delta from this building
+                  for (const effect of bDef.effects) {
+                    if (effect.resourceId === 'faith') {
+                      const bonus = Math.floor(effect.delta * (multiplier - 1));
+                      if (bonus > 0) {
+                        resourceDeltas['faith'] = (resourceDeltas['faith'] ?? 0) + bonus;
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+
         for (const [resId, delta] of Object.entries(resourceDeltas)) {
           yieldAccum[resId] = (yieldAccum[resId] ?? 0) + delta;
         }
         stabilityDelta += bStab;
         totalBuildingUpkeep += upkeepCost;
+
+        // Civ ability: "Sea Traders: Ports generate +N extra trade_goods per turn"
+        const civDef = theme.civilizations.find((c) => c.id === civId);
+        if (civDef && hex.settlement.buildings.includes('port')) {
+          for (const ability of civDef.specialAbilities) {
+            const seaMatch = ability.match(/Ports generate \+(\d+) extra trade_goods/i);
+            if (seaMatch) {
+              yieldAccum['trade_goods'] = (yieldAccum['trade_goods'] ?? 0) + parseInt(seaMatch[1], 10);
+            }
+          }
+        }
+
+        // Civ ability: Merchant Cavalry — cavalry units in settlements with a market generate +N dinars
+        if (civDef) {
+          for (const ability of civDef.specialAbilities) {
+            const cavMatch = ability.match(/Cavalry units generate \+(\d+) dinars.*market/i);
+            if (cavMatch && hex.settlement.buildings.includes('market')) {
+              const bonusPerUnit = parseInt(cavMatch[1], 10);
+              const cavalryPattern = /cavalry|horseman|knight|rider/i;
+              const cavalryUnitsOnHex = hex.units.filter((u) => {
+                if (u.civilizationId !== civId) return false;
+                const uDef = theme.units.find((ud) => ud.id === u.definitionId);
+                return uDef && cavalryPattern.test(uDef.name);
+              });
+              if (cavalryUnitsOnHex.length > 0) {
+                yieldAccum['dinars'] = (yieldAccum['dinars'] ?? 0) + (bonusPerUnit * cavalryUnitsOnHex.length);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // Civ ability: "Diaspora Network: Generate +N dinars from every friendly settlement on the map"
+    const civDef = theme.civilizations.find((c) => c.id === civId);
+    if (civDef) {
+      for (const ability of civDef.specialAbilities) {
+        const diasporaMatch = ability.match(/Generate \+(\d+) dinars? from every friendly settlement/i);
+        if (diasporaMatch) {
+          const bonus = parseInt(diasporaMatch[1], 10);
+          const friendlyRelations = civ.diplomaticRelations;
+          let friendlySettlementCount = 0;
+          for (const hex of allHexes) {
+            if (
+              hex.settlement &&
+              hex.controlledBy !== null &&
+              hex.controlledBy !== civId
+            ) {
+              const rel = friendlyRelations[hex.controlledBy];
+              if (rel === 'peace' || rel === 'alliance') {
+                friendlySettlementCount++;
+              }
+            }
+          }
+          yieldAccum['dinars'] = (yieldAccum['dinars'] ?? 0) + (bonus * friendlySettlementCount);
+        }
+      }
+    }
+
+    // Civ ability: Silver Road — settlements connected to capital via controlled hexes get +N trade_goods
+    if (civDef) {
+      for (const ability of civDef.specialAbilities) {
+        const silverMatch = ability.match(/Settlements connected.*capital.*\+(\d+) trade_goods/i);
+        if (silverMatch) {
+          const bonus = parseInt(silverMatch[1], 10);
+          // Find capital
+          const capitalHex = allHexes.find(
+            (h) => h.controlledBy === civId && h.settlement?.isCapital,
+          );
+          if (capitalHex) {
+            // BFS from capital through controlled hexes
+            const mapRows = state.map.length;
+            const mapCols = mapRows > 0 ? (state.map[0]?.length ?? 0) : 0;
+            const visited = new Set<string>();
+            const queue = [capitalHex.coord];
+            visited.add(`${capitalHex.coord.col},${capitalHex.coord.row}`);
+            while (queue.length > 0) {
+              const current = queue.shift()!;
+              const neighbors = getNeighbors(current, mapCols, mapRows);
+              for (const n of neighbors) {
+                const nKey = `${n.col},${n.row}`;
+                if (visited.has(nKey)) continue;
+                const nHex = state.map[n.row]?.[n.col];
+                if (!nHex || nHex.controlledBy !== civId) continue;
+                visited.add(nKey);
+                queue.push(n);
+              }
+            }
+            // Connected settlements (excluding capital) get the bonus
+            let connectedCount = 0;
+            for (const hex of allHexes) {
+              if (
+                hex.controlledBy === civId &&
+                hex.settlement &&
+                !hex.settlement.isCapital &&
+                visited.has(`${hex.coord.col},${hex.coord.row}`)
+              ) {
+                connectedCount++;
+              }
+            }
+            yieldAccum['trade_goods'] = (yieldAccum['trade_goods'] ?? 0) + (bonus * connectedCount);
+          }
+        }
       }
     }
 
@@ -288,6 +450,32 @@ export function resolveEconomy(state: GameState, theme: ThemePackage): GameState
     // Tech stability bonus
     stabilityDelta += techStabilityBonus;
 
+    // Custom tech effect: stability_bonus_winter
+    if (seasonEffect) {
+      const winterBonus = getCustomTechEffectValue(state, civId, 'stability_bonus_winter', theme);
+      if (winterBonus !== 0 && seasonEffect.phase === 'winter') {
+        stabilityDelta += winterBonus;
+      }
+    }
+
+    // Custom tech effect: resource_conversion — convert resources per turn
+    for (const techId of civ.completedTechs) {
+      const techDef = theme.techTree.find((t) => t.id === techId);
+      if (!techDef) continue;
+      for (const effect of techDef.effects) {
+        if (effect.kind === 'custom' && effect.key === 'resource_conversion' && typeof effect.value === 'object' && effect.value !== null) {
+          const conv = effect.value as { from: string; fromAmount: number; to: string; toAmount: number };
+          if (conv.from && conv.to && typeof conv.fromAmount === 'number' && typeof conv.toAmount === 'number') {
+            const available = (civ.resources[conv.from] ?? 0) + Math.floor(yieldAccum[conv.from] ?? 0);
+            if (available >= conv.fromAmount) {
+              yieldAccum[conv.from] = (yieldAccum[conv.from] ?? 0) - conv.fromAmount;
+              yieldAccum[conv.to] = (yieldAccum[conv.to] ?? 0) + conv.toAmount;
+            }
+          }
+        }
+      }
+    }
+
     // Deduct all upkeep from the dinars yield accumulator
     const totalUpkeep = totalBuildingUpkeep + (unitUpkeepByCiv[civId] ?? 0);
     yieldAccum['dinars'] = (yieldAccum['dinars'] ?? 0) - totalUpkeep;
@@ -298,7 +486,7 @@ export function resolveEconomy(state: GameState, theme: ThemePackage): GameState
     );
     let grainConsumption = 0;
     for (const hex of civSettlements) {
-      grainConsumption += Math.floor((hex.settlement!.population) / 100);
+      grainConsumption += Math.max(1, Math.floor(hex.settlement!.population / 2));
     }
     if (grainConsumption > 0) {
       yieldAccum['grain'] = (yieldAccum['grain'] ?? 0) - grainConsumption;
