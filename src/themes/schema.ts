@@ -53,6 +53,7 @@ export interface CivilizationDefinition {
   name: string;
   description: string;
   color: string;
+  religion?: string;
   startingResources: StartingResources;
   startingTechs: string[];
   uniqueUnits: string[];
