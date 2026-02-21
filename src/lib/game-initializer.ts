@@ -34,12 +34,18 @@ export interface PlayerMapping {
   playerId: string | null;
 }
 
+export interface GameConfigOverrides {
+  fogOfWar?: boolean;
+  turnDeadlineDays?: number;
+}
+
 export function initializeGameState(
   gameId: string,
   theme: ThemePackage,
   playerMappings: PlayerMapping[],
   seed: number,
-  createdAt: string
+  createdAt: string,
+  configOverrides?: GameConfigOverrides,
 ): GameState {
   const prng = createPRNG(seed);
   const rawMap = generateMap(theme.map, prng);
@@ -184,10 +190,10 @@ export function initializeGameState(
     rngState: prng.state,
     config: {
       maxTurns: null,
-      turnDeadlineDays: 7,
+      turnDeadlineDays: configOverrides?.turnDeadlineDays ?? 7,
       allowAIGovernor: true,
       difficultyModifier: 1,
-      fogOfWar: false,
+      fogOfWar: configOverrides?.fogOfWar ?? false,
     },
     createdAt,
     lastResolvedAt: null,

@@ -1,5 +1,11 @@
+// Turn deadline enforcement: client-side auto-resolve.
+// When lastResolvedAt + turnDeadlineDays has elapsed, the client auto-fills
+// missing orders via AI governor and resolves the turn. This approach was
+// chosen over server-side enforcement because the game runs entirely on
+// free-tier Supabase with no server functions.
+
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { AnyOrder } from '@/engine/types';
 import type { ThemePackage } from '@/themes/schema';
 import { HexMap } from '@/components/map/HexMap';
@@ -13,6 +19,9 @@ import { GameHeader } from '@/components/game/GameHeader';
 import { Spinner } from '@/components/ui/Spinner';
 import { useGameState } from '@/lib/hooks/useGameState';
 import { useHexSelection } from '@/lib/hooks/useHexSelection';
+import { supabase } from '@/lib/supabase';
+import { resolveTurn } from '@/engine/turn-resolver';
+import { createPRNGFromState } from '@/engine/prng';
 
 interface GameViewProps {
   gameId: string;
@@ -35,6 +44,40 @@ export function GameView({
   useEffect(() => {
     setPendingOrders([]);
   }, [gameState?.turn]);
+
+  // Turn deadline enforcement: auto-resolve if deadline has passed
+  const deadlineResolved = useRef(false);
+  useEffect(() => {
+    if (!gameState || gameState.phase !== 'active' || deadlineResolved.current) return;
+    const deadlineDays = gameState.config.turnDeadlineDays;
+    if (deadlineDays <= 0) return;
+
+    const baseTime = gameState.lastResolvedAt ?? gameState.createdAt;
+    const deadlineMs = new Date(baseTime).getTime() + deadlineDays * 24 * 60 * 60 * 1000;
+    if (Date.now() < deadlineMs) return;
+
+    deadlineResolved.current = true;
+    (async () => {
+      try {
+        const prng = createPRNGFromState(gameState.rngState);
+        const now = new Date().toISOString();
+        // Fetch submitted orders
+        const { data: rows } = await supabase
+          .from('turn_orders').select('orders')
+          .eq('game_id', gameId).eq('turn_number', gameState.turn);
+        const submittedOrders = (rows ?? []).map(
+          (r: { orders: unknown }) => r.orders as unknown as import('@/engine/types').PlayerOrders,
+        );
+        const { state: ns } = resolveTurn(gameState, submittedOrders, theme, prng, now);
+        await supabase.from('games')
+          .update({ game_state: ns as unknown as Record<string, unknown>, phase: ns.phase })
+          .eq('id', gameId).eq('game_state->>turn', String(gameState.turn));
+        refresh();
+      } catch {
+        // Silently fail — another client may have already resolved
+      }
+    })();
+  }, [gameState, gameId, theme, refresh]);
 
   if (loading) {
     return (

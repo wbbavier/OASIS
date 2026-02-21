@@ -13,6 +13,7 @@ export default function CreatePage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
   const [name, setName] = useState('');
+  const [fogOfWar, setFogOfWar] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -91,6 +92,16 @@ export default function CreatePage() {
               faiths and five kingdoms circle one another as a golden age ends.
             </p>
           </div>
+
+          <label className="flex items-center gap-3 cursor-pointer">
+            <input type="checkbox" checked={fogOfWar}
+              onChange={(e) => setFogOfWar(e.target.checked)}
+              className="h-4 w-4 rounded border-stone-600 bg-stone-800 text-indigo-500 focus:ring-indigo-500" />
+            <div>
+              <span className="text-sm font-medium text-stone-200">Fog of War</span>
+              <p className="text-xs text-stone-400">Hide unexplored regions of the map</p>
+            </div>
+          </label>
 
           {error && <p className="text-sm text-red-400">{error}</p>}
 

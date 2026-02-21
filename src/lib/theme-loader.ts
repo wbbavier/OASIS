@@ -1,31 +1,23 @@
 // Theme package loader — validates and returns a typed ThemePackage.
-// Phase 1: type assertion only. Phase 3 will add Zod schema validation.
+// Uses Zod schema for full runtime validation.
 
 import type { ThemePackage } from '@/themes/schema';
+import { themePackageSchema } from '@/lib/theme-schema';
 
 export function loadTheme(raw: unknown): ThemePackage {
   if (raw === null || typeof raw !== 'object') {
     throw new Error('Theme data must be a non-null object');
   }
 
-  const pkg = raw as Record<string, unknown>;
-
-  // Basic required-field presence checks
-  const requiredFields: (keyof ThemePackage)[] = [
-    'id', 'name', 'description', 'source',
-    'civilizations', 'map', 'resources', 'techTree',
-    'buildings', 'units', 'events', 'diplomacyOptions',
-    'victoryConditions', 'defeatConditions', 'mechanics', 'flavor',
-  ];
-
-  for (const field of requiredFields) {
-    if (!(field in pkg)) {
-      throw new Error(`Theme is missing required field: "${field}"`);
-    }
+  const result = themePackageSchema.safeParse(raw);
+  if (!result.success) {
+    const issues = result.error.issues.slice(0, 5)
+      .map((i) => `${i.path.join('.')}: ${i.message}`)
+      .join('; ');
+    throw new Error(`Theme validation failed: ${issues}`);
   }
 
-  // Phase 3: replace this cast with a Zod parse for full runtime safety
-  return raw as ThemePackage;
+  return result.data as ThemePackage;
 }
 
 export function loadThemeFromJson(json: string): ThemePackage {
