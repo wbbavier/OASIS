@@ -12,7 +12,11 @@ interface HexCellProps {
   visible: boolean;
   isSelected: boolean;
   isReachable: boolean;
+  isOnPath?: boolean;
+  isQueuedMove?: boolean;
   onClick?: () => void;
+  onHover?: () => void;
+  onHoverEnd?: () => void;
 }
 
 function buildTooltip(hex: Hex, visible: boolean, civNames?: Record<string, string>): string {
@@ -41,7 +45,8 @@ function buildTooltip(hex: Hex, visible: boolean, civNames?: Record<string, stri
 }
 
 export function HexCell({
-  hex, civColors, civNames, visible, isSelected, isReachable, onClick,
+  hex, civColors, civNames, visible, isSelected, isReachable,
+  isOnPath, isQueuedMove, onClick, onHover, onHoverEnd,
 }: HexCellProps) {
   const [cx, cy] = hexCenter(hex.coord.col, hex.coord.row, HEX_SIZE);
   const baseFill = TERRAIN_FILL[hex.terrain] ?? '#555';
@@ -60,7 +65,8 @@ export function HexCell({
   }
 
   return (
-    <g onClick={onClick} className={onClick ? 'cursor-pointer' : undefined}>
+    <g onClick={onClick} onPointerEnter={onHover} onPointerLeave={onHoverEnd}
+      className={onClick ? 'cursor-pointer' : undefined}>
       <title>{buildTooltip(hex, visible, civNames)}</title>
       <polygon points={hexPoints(cx, cy, HEX_SIZE - 1)} fill={fill}
         stroke={visible ? '#4A463E' : '#333'} strokeWidth={0.5} opacity={visible ? 1 : 0.3} />
@@ -75,6 +81,14 @@ export function HexCell({
       {isReachable && (
         <polygon points={hexPoints(cx, cy, HEX_SIZE - 1)} fill="rgba(74,222,128,0.2)"
           stroke="rgba(74,222,128,0.6)" strokeWidth={1.5} pointerEvents="none" />
+      )}
+      {isOnPath && (
+        <polygon points={hexPoints(cx, cy, HEX_SIZE - 1)} fill="rgba(96,165,250,0.3)"
+          stroke="rgba(96,165,250,0.8)" strokeWidth={2} pointerEvents="none" />
+      )}
+      {isQueuedMove && (
+        <polygon points={hexPoints(cx, cy, HEX_SIZE - 1)} fill="rgba(251,191,36,0.15)"
+          stroke="rgba(251,191,36,0.5)" strokeWidth={1.5} pointerEvents="none" strokeDasharray="3,2" />
       )}
       {visible && hex.settlement && (
         <>

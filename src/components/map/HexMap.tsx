@@ -1,9 +1,10 @@
 'use client';
-import { useRef, useState, useCallback } from 'react';
+import { useRef, useState, useCallback, useMemo } from 'react';
 import type { Hex, HexCoord } from '@/engine/types';
 import { HEX_SIZE, SQRT3, hexCenter } from './hex-utils';
 import { HexCell } from './HexCell';
 import { ZoomControls } from './ZoomControls';
+import { getPathTo } from '@/engine/pathfinding';
 
 export { TERRAIN_FILL } from './hex-utils';
 
@@ -16,6 +17,8 @@ interface HexMapProps {
   selectedCoord?: HexCoord | null;
   reachableCoords?: HexCoord[];
   fogOfWar?: boolean;
+  selectedUnitMoves?: number;
+  queuedMoveCoords?: HexCoord[];
 }
 
 const MIN_ZOOM = 0.4;
@@ -24,6 +27,7 @@ const MAX_ZOOM = 2.5;
 export function HexMap({
   map, currentCivId, civColors, civNames,
   onHexClick, selectedCoord, reachableCoords, fogOfWar = false,
+  selectedUnitMoves, queuedMoveCoords,
 }: HexMapProps) {
   const rows = map.length;
   const cols = rows > 0 ? (map[0]?.length ?? 0) : 0;
@@ -36,8 +40,21 @@ export function HexMap({
   const [dragging, setDragging] = useState(false);
   const dragStart = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
 
+  const [hoveredCoord, setHoveredCoord] = useState<HexCoord | null>(null);
+
   const selectedKey = selectedCoord ? `${selectedCoord.col},${selectedCoord.row}` : null;
   const reachableSet = new Set(reachableCoords?.map((c) => `${c.col},${c.row}`) ?? []);
+
+  // Compute path from selected unit to hovered reachable hex
+  const pathCoords = useMemo(() => {
+    if (!selectedCoord || !hoveredCoord || !selectedUnitMoves) return null;
+    const hovKey = `${hoveredCoord.col},${hoveredCoord.row}`;
+    if (!reachableSet.has(hovKey)) return null;
+    return getPathTo(map, selectedCoord, hoveredCoord, selectedUnitMoves);
+  }, [selectedCoord, hoveredCoord, selectedUnitMoves, map, reachableSet]);
+
+  const pathSet = new Set(pathCoords?.map((c) => `${c.col},${c.row}`) ?? []);
+  const queuedSet = new Set(queuedMoveCoords?.map((c) => `${c.col},${c.row}`) ?? []);
 
   const handleWheel = useCallback((e: React.WheelEvent) => {
     e.preventDefault();
@@ -104,7 +121,13 @@ export function HexMap({
                 <HexCell key={key} hex={hex} civColors={civColors} civNames={civNames}
                   visible={visible} isSelected={key === selectedKey}
                   isReachable={reachableSet.has(key)}
-                  onClick={onHexClick ? () => onHexClick(hex) : undefined} />
+                  isOnPath={pathSet.has(key)}
+                  isQueuedMove={queuedSet.has(key)}
+                  onClick={onHexClick ? () => onHexClick(hex) : undefined}
+                  onHover={() => setHoveredCoord(hex.coord)}
+                  onHoverEnd={() => setHoveredCoord((prev) =>
+                    prev?.col === hex.coord.col && prev?.row === hex.coord.row ? null : prev
+                  )} />
               );
             })
           )}
