@@ -181,6 +181,32 @@ export function generateAIOrders(
     };
   }
 
+  // Muwardi AI: simple aggressive behavior — move all units toward nearest settlement, attack on contact
+  if (civId === 'muwardi') {
+    const ownedUnits = getOwnedUnits(state, civId);
+    // Find all non-muwardi settlements
+    const targetSettlements = state.map.flat().filter(
+      (h) => h.settlement !== null && h.controlledBy !== 'muwardi',
+    );
+    const targets = new Set(targetSettlements.map((h) => `${h.coord.col},${h.coord.row}`));
+
+    for (const lu of ownedUnits) {
+      if (lu.unit.movesRemaining <= 0) continue;
+      const path = findPathToward(state.map, lu.coord, targets, lu.unit.movesRemaining);
+      if (path && path.length > 0) {
+        orders.push({ kind: 'move', unitId: lu.unit.id, path });
+      }
+    }
+
+    return {
+      playerId: 'ai_muwardi',
+      civilizationId: civId,
+      turnNumber: state.turn,
+      orders,
+      submittedAt,
+    };
+  }
+
   const civDef = theme.civilizations.find((c) => c.id === civId);
   const personality = classifyPersonality(civDef?.specialAbilities ?? []);
   const ownedUnits = getOwnedUnits(state, civId);

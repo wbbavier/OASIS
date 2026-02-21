@@ -54,6 +54,9 @@ export function initializeGameState(
   const civilizations: Record<string, CivilizationState> = {};
 
   for (const civDef of theme.civilizations) {
+    // Skip Muwardi at game init — they are spawned dynamically by the invasion mechanic
+    if (civDef.id === 'muwardi') continue;
+
     const startingRelations: Record<string, RelationshipState> =
       theme.id === 'al-rassan'
         ? { ...(AL_RASSAN_RELATIONS[civDef.id] ?? {}) }
@@ -91,6 +94,7 @@ export function initializeGameState(
       tensionAxes: startingTensionAxes,
       isEliminated: false,
       turnsMissingOrders: 0,
+      turnsAtZeroStability: 0,
     };
   }
 
@@ -99,6 +103,9 @@ export function initializeGameState(
   const mapCols = map[0]?.length ?? 0;
 
   for (const civDef of theme.civilizations) {
+    // Skip Muwardi — they have no settlements or starting units
+    if (civDef.id === 'muwardi') continue;
+
     // Find the capital hex for this civ
     let capitalRow = -1;
     let capitalCol = -1;

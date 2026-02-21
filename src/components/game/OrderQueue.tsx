@@ -31,6 +31,8 @@ function describeOrder(order: AnyOrder, theme: ThemePackage): string {
       return `Event response: ${order.choiceId}`;
     case 'resource_allocation':
       return 'Resource allocation';
+    case 'split_stack':
+      return `Split stack to (${order.destinationCoord.col},${order.destinationCoord.row})`;
   }
 }
 
@@ -43,6 +45,7 @@ function orderKindIcon(kind: AnyOrder['kind']): string {
     case 'diplomatic': return '\ud83e\udd1d';
     case 'event_response': return '\u26a1';
     case 'resource_allocation': return '\ud83d\udce6';
+    case 'split_stack': return '\u2702\ufe0f';
   }
 }
 

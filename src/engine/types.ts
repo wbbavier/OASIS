@@ -87,6 +87,17 @@ export interface CivilizationState {
   tensionAxes: Record<string, number>;
   isEliminated: boolean;
   turnsMissingOrders: number;
+  turnsAtZeroStability: number;
+}
+
+// ---------------------------------------------------------------------------
+// Diplomatic messages
+// ---------------------------------------------------------------------------
+
+export interface DiplomaticMessage {
+  fromCivId: string;
+  toCivId: string;
+  message: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -146,6 +157,11 @@ export interface GameConfig {
   fogOfWar: boolean;
 }
 
+export interface MuwardiInvasion {
+  active: boolean;
+  spawnedOnTurn: number;
+}
+
 export interface GameState {
   gameId: string;
   themeId: string;
@@ -160,6 +176,7 @@ export interface GameState {
   config: GameConfig;
   createdAt: string;
   lastResolvedAt: string | null;
+  muwardiInvasion?: MuwardiInvasion;
 }
 
 // ---------------------------------------------------------------------------
@@ -218,6 +235,13 @@ export interface ResourceAllocationOrder {
   allocations: Record<string, number>;
 }
 
+export interface SplitStackOrder {
+  kind: 'split_stack';
+  hexCoord: HexCoord;
+  unitIds: string[];
+  destinationCoord: HexCoord;
+}
+
 export type AnyOrder =
   | MoveOrder
   | ConstructionOrder
@@ -225,7 +249,8 @@ export type AnyOrder =
   | DiplomaticAction
   | EventResponse
   | RecruitOrder
-  | ResourceAllocationOrder;
+  | ResourceAllocationOrder
+  | SplitStackOrder;
 
 export interface PlayerOrders {
   playerId: string;

@@ -11,14 +11,16 @@ import type {
   TurnSummary,
   CivilizationState,
   CombatResultSummary,
+  DiplomaticMessage,
   Hex,
   Unit,
+  MuwardiInvasion,
 } from '@/engine/types';
 import type { ThemePackage } from '@/themes/schema';
 import { fillMissingOrdersWithAI } from '@/engine/ai-governor';
 import { resolveDiplomacy } from '@/engine/diplomacy';
 import { resolveCombat } from '@/engine/combat';
-import { resolveEconomy } from '@/engine/economy';
+import { resolveEconomy, getCustomTechEffectValue } from '@/engine/economy';
 import { resolveEvents } from '@/engine/events';
 import { getNeighbors } from '@/engine/map-generator';
 
@@ -240,9 +242,25 @@ function resolveConstruction(
         continue;
       }
 
+      // Civ ability: building cost reduction (e.g. "Libraries cost 10 dinars less to build")
+      let costReduction = 0;
+      const civDef = theme.civilizations.find((c) => c.id === civId);
+      if (civDef) {
+        for (const ability of civDef.specialAbilities) {
+          const match = ability.match(/(\w[\w\s]*?) cost (\d+) dinars less/i);
+          if (match) {
+            const buildingNamePattern = match[1].toLowerCase();
+            if (buildingDef.name.toLowerCase().includes(buildingNamePattern)) {
+              costReduction += parseInt(match[2], 10);
+            }
+          }
+        }
+      }
+      const effectiveCost = Math.max(0, buildingDef.cost - costReduction);
+
       const currentDinars = civ.resources['dinars'] ?? 0;
-      if (currentDinars < buildingDef.cost) {
-        messages.push(`Building ${buildingDefinitionId}: insufficient dinars (${currentDinars} < ${buildingDef.cost}), skipped`);
+      if (currentDinars < effectiveCost) {
+        messages.push(`Building ${buildingDefinitionId}: insufficient dinars (${currentDinars} < ${effectiveCost}), skipped`);
         continue;
       }
 
@@ -271,7 +289,7 @@ function resolveConstruction(
             ...s.civilizations[civId],
             resources: {
               ...civ.resources,
-              dinars: currentDinars - buildingDef.cost,
+              dinars: currentDinars - effectiveCost,
             },
           },
         },
@@ -473,6 +491,281 @@ function resolveResearch(
 }
 
 // ---------------------------------------------------------------------------
+// Tension accumulation — adjusts religious_fervor based on turn actions
+// ---------------------------------------------------------------------------
+
+function resolveTension(
+  state: GameState,
+  theme: ThemePackage,
+  diplomacyProposals: Array<{ source: string; target: string; actionType: string }>,
+  newAlliancePairs: Array<[string, string]>,
+  controlTransfers: Array<{ hexCoord: { col: number; row: number }; newOwner: string; previousOwner: string | null }>,
+  constructedBuildings: Array<{ civId: string; buildingId: string }>,
+  completedTechsCiv: Array<{ civId: string; techId: string }>,
+): { state: GameState; log: ResolutionLog } {
+  const messages: string[] = [];
+  const hasTensionAxis = theme.mechanics.tensionAxes.some((a) => a.id === 'religious_fervor');
+  if (!hasTensionAxis) return { state, log: logPhase('attrition', ['No tension axis defined']) };
+
+  const civs = { ...state.civilizations };
+
+  // Helper to get religion for a civ
+  function getReligion(civId: string): string | undefined {
+    return theme.civilizations.find((c) => c.id === civId)?.religion;
+  }
+
+  // Cross-religion war declaration: +10
+  for (const proposal of diplomacyProposals) {
+    if (proposal.actionType !== 'declare_war') continue;
+    const srcRel = getReligion(proposal.source);
+    const tgtRel = getReligion(proposal.target);
+    if (srcRel && tgtRel && srcRel !== tgtRel) {
+      for (const civId of [proposal.source, proposal.target]) {
+        const civ = civs[civId];
+        if (!civ || civ.isEliminated) continue;
+        const current = civ.tensionAxes['religious_fervor'] ?? 0;
+        civs[civId] = { ...civ, tensionAxes: { ...civ.tensionAxes, religious_fervor: Math.min(100, current + 10) } };
+      }
+      messages.push(`Cross-religion war: ${proposal.source} vs ${proposal.target}, religious_fervor +10`);
+    }
+  }
+
+  // Same-religion alliance formed: -5
+  for (const [civA, civB] of newAlliancePairs) {
+    const relA = getReligion(civA);
+    const relB = getReligion(civB);
+    if (relA && relB && relA === relB) {
+      for (const civId of [civA, civB]) {
+        const civ = civs[civId];
+        if (!civ || civ.isEliminated) continue;
+        const current = civ.tensionAxes['religious_fervor'] ?? 0;
+        civs[civId] = { ...civ, tensionAxes: { ...civ.tensionAxes, religious_fervor: Math.max(0, current - 5) } };
+      }
+      messages.push(`Same-religion alliance: ${civA} & ${civB}, religious_fervor -5`);
+    }
+  }
+
+  // Conquered different-religion settlement: +8
+  for (const transfer of controlTransfers) {
+    if (!transfer.previousOwner) continue;
+    const newRel = getReligion(transfer.newOwner);
+    const prevRel = getReligion(transfer.previousOwner);
+    if (newRel && prevRel && newRel !== prevRel) {
+      const civ = civs[transfer.newOwner];
+      if (civ && !civ.isEliminated) {
+        const current = civ.tensionAxes['religious_fervor'] ?? 0;
+        civs[transfer.newOwner] = { ...civ, tensionAxes: { ...civ.tensionAxes, religious_fervor: Math.min(100, current + 8) } };
+        messages.push(`Cross-religion conquest by ${transfer.newOwner}, religious_fervor +8`);
+      }
+    }
+  }
+
+  // Religious building constructed: +3 own civ, +5 to neighbor civs of different religion
+  const religiousBuildingPattern = /mosque|cathedral|synagogue/i;
+  for (const { civId, buildingId } of constructedBuildings) {
+    const buildingDef = theme.buildings.find((b) => b.id === buildingId);
+    if (!buildingDef || !religiousBuildingPattern.test(buildingDef.name)) continue;
+
+    const civ = civs[civId];
+    if (!civ || civ.isEliminated) continue;
+    const ownRel = getReligion(civId);
+    const current = civ.tensionAxes['religious_fervor'] ?? 0;
+    civs[civId] = { ...civ, tensionAxes: { ...civ.tensionAxes, religious_fervor: Math.min(100, current + 3) } };
+    messages.push(`Religious building built by ${civId}, religious_fervor +3`);
+
+    // +5 to neighbor civs of different religion
+    for (const otherCivId of Object.keys(civs)) {
+      if (otherCivId === civId) continue;
+      const otherCiv = civs[otherCivId];
+      if (!otherCiv || otherCiv.isEliminated) continue;
+      const otherRel = getReligion(otherCivId);
+      if (ownRel && otherRel && ownRel !== otherRel) {
+        const otherCurrent = otherCiv.tensionAxes['religious_fervor'] ?? 0;
+        civs[otherCivId] = { ...otherCiv, tensionAxes: { ...otherCiv.tensionAxes, religious_fervor: Math.min(100, otherCurrent + 5) } };
+      }
+    }
+  }
+
+  // Tolerant tech researched: -3 all civs
+  for (const { techId } of completedTechsCiv) {
+    const techDef = theme.techTree.find((t) => t.id === techId);
+    if (!techDef) continue;
+    const hasTensionReduction = techDef.effects.some(
+      (e) => e.kind === 'custom' && e.key === 'tension_reduction',
+    );
+    if (hasTensionReduction) {
+      for (const cId of Object.keys(civs)) {
+        const c = civs[cId];
+        if (!c || c.isEliminated) continue;
+        const current = c.tensionAxes['religious_fervor'] ?? 0;
+        civs[cId] = { ...c, tensionAxes: { ...c.tensionAxes, religious_fervor: Math.max(0, current - 3) } };
+      }
+      messages.push(`Tolerant tech ${techId} researched, all civs religious_fervor -3`);
+    }
+  }
+
+  return {
+    state: { ...state, civilizations: civs },
+    log: logPhase('attrition', messages.length > 0 ? messages : ['Tension resolved']),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Muwardi invasion — spawns when Asharite civ has high tension for 2+ turns
+// ---------------------------------------------------------------------------
+
+function resolveMuwardiInvasion(
+  state: GameState,
+  theme: ThemePackage,
+  prng: PRNG,
+): { state: GameState; log: ResolutionLog } {
+  const messages: string[] = [];
+  let s = state;
+
+  const muwardiCivDef = theme.civilizations.find((c) => c.id === 'muwardi');
+  if (!muwardiCivDef) return { state: s, log: logPhase('attrition', ['No Muwardi civ defined']) };
+
+  // Check if all Muwardi units are destroyed → deactivate invasion
+  if (s.muwardiInvasion?.active) {
+    const muwardiUnits = s.map.flat().flatMap((h) => h.units.filter((u) => u.civilizationId === 'muwardi'));
+    if (muwardiUnits.length === 0) {
+      messages.push('All Muwardi units destroyed — invasion ended');
+      // Reduce tension for all civs
+      const civs = { ...s.civilizations };
+      for (const civId of Object.keys(civs)) {
+        const civ = civs[civId];
+        if (civ.isEliminated) continue;
+        const current = civ.tensionAxes['religious_fervor'] ?? 0;
+        civs[civId] = { ...civ, tensionAxes: { ...civ.tensionAxes, religious_fervor: Math.max(0, current - 20) } };
+      }
+      s = { ...s, civilizations: civs, muwardiInvasion: { active: false, spawnedOnTurn: s.muwardiInvasion.spawnedOnTurn } };
+
+      // Neutralize any settlements captured by muwardi
+      const newMap = s.map.map((row) =>
+        row.map((hex) => hex.controlledBy === 'muwardi' ? { ...hex, controlledBy: null } : hex),
+      );
+      s = { ...s, map: newMap };
+      return { state: s, log: logPhase('attrition', messages) };
+    }
+  }
+
+  // Check spawn condition: Asharite civ with religious_fervor > 90 for 2+ turns
+  if (!s.muwardiInvasion?.active) {
+    const ashariteCivs = Object.keys(s.civilizations).filter((civId) => {
+      const civDef = theme.civilizations.find((c) => c.id === civId);
+      return civDef?.religion === 'asharite' && !s.civilizations[civId].isEliminated;
+    });
+
+    let shouldSpawn = false;
+    for (const civId of ashariteCivs) {
+      const civ = s.civilizations[civId];
+      const fervor = civ.tensionAxes['religious_fervor'] ?? 0;
+      if (fervor > 90) {
+        // Track via muwardi_threat axis as consecutive counter
+        const consecutive = (civ.tensionAxes['muwardi_threat'] ?? 0) + 1;
+        const civs = { ...s.civilizations };
+        civs[civId] = { ...civ, tensionAxes: { ...civ.tensionAxes, muwardi_threat: consecutive } };
+        s = { ...s, civilizations: civs };
+        if (consecutive >= 2) {
+          shouldSpawn = true;
+          messages.push(`${civId} religious_fervor >90 for ${consecutive} turns — Muwardi invasion triggered`);
+        }
+      }
+    }
+
+    if (shouldSpawn) {
+      // Find southern edge hexes near Asharite territory
+      const mapRows = s.map.length;
+      const spawnRow = mapRows - 1;
+      const spawnHexes = (s.map[spawnRow] ?? []).filter(
+        (h) => h.terrain !== 'sea' && h.units.length === 0,
+      );
+
+      // Pick 1-2 spawn hexes
+      const selectedHexes = spawnHexes.slice(0, Math.min(2, spawnHexes.length));
+      if (selectedHexes.length === 0) {
+        return { state: s, log: logPhase('attrition', ['Muwardi spawn: no valid hexes']) };
+      }
+
+      // Find Muwardi unit definitions
+      const muwardiUnits = theme.units.filter((u) => {
+        const civUniques = muwardiCivDef.uniqueUnits;
+        return civUniques.includes(u.id) || u.id === 'muwardi-warrior' || u.id === 'muwardi-zealot';
+      });
+      const fallbackUnit = theme.units.find((u) => u.id === 'levy-spearman') ?? theme.units[0];
+      const unitDef = muwardiUnits.length > 0 ? muwardiUnits[0] : fallbackUnit;
+
+      if (!unitDef) return { state: s, log: logPhase('attrition', messages) };
+
+      // Spawn 3-5 units spread across selected hexes
+      const unitCount = prng.nextInt(3, 5);
+      const newMap = s.map.map((row) => row.map((hex) => ({ ...hex, units: [...hex.units] })));
+
+      for (let i = 0; i < unitCount; i++) {
+        const targetHex = selectedHexes[i % selectedHexes.length];
+        const r = targetHex.coord.row;
+        const c = targetHex.coord.col;
+        const newUnit: Unit = {
+          id: `muwardi-unit-${s.turn}-${i}`,
+          definitionId: unitDef.id,
+          civilizationId: 'muwardi',
+          strength: unitDef.strength,
+          morale: unitDef.morale,
+          movesRemaining: unitDef.moves,
+          isGarrisoned: false,
+        };
+        if (newMap[r]?.[c]) {
+          newMap[r][c] = { ...newMap[r][c], units: [...newMap[r][c].units, newUnit] };
+        }
+      }
+
+      // Set Muwardi at war with all non-eliminated civs
+      const civs = { ...s.civilizations };
+      // Create muwardi civ state if not exists
+      if (!civs['muwardi']) {
+        const warRelations: Record<string, import('@/engine/types').RelationshipState> = {};
+        for (const civId of Object.keys(civs)) {
+          warRelations[civId] = 'war';
+        }
+        civs['muwardi'] = {
+          id: 'muwardi',
+          playerId: null,
+          resources: {},
+          techProgress: {},
+          completedTechs: [],
+          culturalInfluence: 0,
+          stability: 100,
+          diplomaticRelations: warRelations,
+          tensionAxes: {},
+          isEliminated: false,
+          turnsMissingOrders: 0,
+          turnsAtZeroStability: 0,
+        };
+      }
+      // Set all civs at war with muwardi
+      for (const civId of Object.keys(civs)) {
+        if (civId === 'muwardi') continue;
+        const civ = civs[civId];
+        civs[civId] = {
+          ...civ,
+          diplomaticRelations: { ...civ.diplomaticRelations, muwardi: 'war' },
+        };
+      }
+
+      s = {
+        ...s,
+        map: newMap,
+        civilizations: civs,
+        muwardiInvasion: { active: true, spawnedOnTurn: s.turn },
+      };
+      messages.push(`Muwardi invasion spawned ${unitCount} units on the southern coast`);
+    }
+  }
+
+  return { state: s, log: logPhase('attrition', messages.length > 0 ? messages : ['Muwardi check resolved']) };
+}
+
+// ---------------------------------------------------------------------------
 // Attrition & Stability
 // ---------------------------------------------------------------------------
 
@@ -482,6 +775,7 @@ function resolveAttrition(
 ): { state: GameState; log: ResolutionLog } {
   const messages: string[] = [];
   const hasGrainResource = theme.resources.some((r) => r.id === 'grain');
+  const hasTensionAxis = theme.mechanics.tensionAxes.some((a) => a.id === 'religious_fervor');
   const updatedCivs: Record<string, CivilizationState> = {};
 
   for (const civId of Object.keys(state.civilizations)) {
@@ -492,6 +786,7 @@ function resolveAttrition(
     }
 
     let stabilityChange = 0;
+    let cultureBonus = 0;
 
     // Grain attrition: only if grain resource exists in theme and civ has none
     if (hasGrainResource && (civ.resources['grain'] ?? 0) <= 0) {
@@ -505,8 +800,25 @@ function resolveAttrition(
       messages.push(`Civ ${civId}: war attrition, stability -2`);
     }
 
+    // Tension-based attrition
+    if (hasTensionAxis) {
+      const fervor = civ.tensionAxes['religious_fervor'] ?? 0;
+      if (fervor > 70) {
+        stabilityChange -= 2;
+        messages.push(`Civ ${civId}: high religious tension (${fervor}), stability -2`);
+      }
+      if (fervor < 30) {
+        stabilityChange += 1;
+        cultureBonus = 2;
+        messages.push(`Civ ${civId}: low religious tension (${fervor}), stability +1, culture +2`);
+      }
+    }
+
     const newStability = Math.max(0, Math.min(100, civ.stability + stabilityChange));
-    updatedCivs[civId] = { ...civ, stability: newStability };
+    const newResources = cultureBonus > 0
+      ? { ...civ.resources, faith: (civ.resources['faith'] ?? 0) + cultureBonus }
+      : civ.resources;
+    updatedCivs[civId] = { ...civ, stability: newStability, resources: newResources };
   }
 
   return {
@@ -553,8 +865,26 @@ function checkVictoryDefeat(
         }
         case 'stability_zero': {
           if (civ.stability === 0) {
-            eliminated = true;
-            messages.push(`Civ ${civId}: stability at zero, eliminated`);
+            const newCount = (civ.turnsAtZeroStability ?? 0) + 1;
+            const threshold = condition.turnsAtZero ?? 1;
+            if (newCount >= threshold) {
+              eliminated = true;
+              messages.push(`Civ ${civId}: stability at zero for ${newCount} turn(s), eliminated`);
+            } else {
+              messages.push(`Civ ${civId}: stability at zero (${newCount}/${threshold} turns)`);
+              // Update the counter without eliminating
+              updatedCivs = {
+                ...updatedCivs,
+                [civId]: { ...updatedCivs[civId], turnsAtZeroStability: newCount },
+              };
+            }
+          } else if ((civ.turnsAtZeroStability ?? 0) > 0) {
+            // Stability recovered — reset counter
+            updatedCivs = {
+              ...updatedCivs,
+              [civId]: { ...updatedCivs[civId], turnsAtZeroStability: 0 },
+            };
+            messages.push(`Civ ${civId}: stability recovered, zero-stability counter reset`);
           }
           break;
         }
@@ -720,6 +1050,7 @@ function generateSummary(
   completedTechsBefore: Record<string, string[]>,
   combatResults: CombatResultSummary[],
   movementMessages: string[],
+  diplomaticMessages: DiplomaticMessage[],
 ): { state: GameState; log: ResolutionLog; summary: TurnSummary } {
   const summary: TurnSummary = {
     turnNumber: state.turn,
@@ -765,6 +1096,13 @@ function generateSummary(
       for (const msg of movementMessages) {
         if (msg.includes(civId) || msg.includes(`unit-start-${civId}`) || msg.includes(`unit-recruit-${civId}`)) {
           narrativeLines.push(msg);
+        }
+      }
+
+      // Diplomatic messages received by this civ
+      for (const dm of diplomaticMessages) {
+        if (dm.toCivId === civId) {
+          narrativeLines.push(`Message from ${dm.fromCivId}: ${dm.message}`);
         }
       }
 
@@ -818,14 +1156,21 @@ export function resolveTurn(
   let s = state;
 
   // Reset movesRemaining for all units at the start of each turn
+  // Apply movement_range_bonus from custom tech effects
   const unitMovesLookup = new Map(theme.units.map((u) => [u.id, u.moves]));
+  const moveBonusByCiv = new Map<string, number>();
+  for (const civId of Object.keys(s.civilizations)) {
+    const bonus = getCustomTechEffectValue(s, civId, 'movement_range_bonus', theme);
+    if (bonus !== 0) moveBonusByCiv.set(civId, bonus);
+  }
   const resetMap = state.map.map((row) =>
     row.map((hex) => ({
       ...hex,
-      units: hex.units.map((unit) => ({
-        ...unit,
-        movesRemaining: unitMovesLookup.get(unit.definitionId) ?? unit.movesRemaining,
-      })),
+      units: hex.units.map((unit) => {
+        const baseMoves = unitMovesLookup.get(unit.definitionId) ?? unit.movesRemaining;
+        const bonus = moveBonusByCiv.get(unit.civilizationId) ?? 0;
+        return { ...unit, movesRemaining: baseMoves + bonus };
+      }),
     })),
   );
   s = { ...s, map: resetMap };
@@ -847,7 +1192,9 @@ export function resolveTurn(
   );
 
   // Diplomacy
-  s = resolveDiplomacy(s, allOrders, theme);
+  const diplomacyResult = resolveDiplomacy(s, allOrders, theme);
+  s = diplomacyResult.state;
+  const diplomaticMessages = diplomacyResult.diplomaticMessages;
   logs.push(logPhase('diplomacy', ['Diplomacy resolved']));
 
   // Validate orders
@@ -860,13 +1207,62 @@ export function resolveTurn(
   s = movementResult.state;
   logs.push(movementResult.log);
 
+  // Split stack processing (before movement)
+  for (const playerOrders of allOrders) {
+    for (const order of playerOrders.orders) {
+      if (order.kind !== 'split_stack') continue;
+      const { hexCoord, unitIds, destinationCoord } = order;
+      const mapRows = s.map.length;
+      const mapCols = mapRows > 0 ? (s.map[0]?.length ?? 0) : 0;
+
+      // Validate destination is adjacent
+      const neighbors = getNeighbors(hexCoord, mapCols, mapRows);
+      const isAdjacent = neighbors.some((n) => n.col === destinationCoord.col && n.row === destinationCoord.row);
+      if (!isAdjacent) continue;
+
+      const sourceHex = s.map[hexCoord.row]?.[hexCoord.col];
+      const destHex = s.map[destinationCoord.row]?.[destinationCoord.col];
+      if (!sourceHex || !destHex) continue;
+
+      const unitsToMove = sourceHex.units.filter((u) => unitIds.includes(u.id));
+      if (unitsToMove.length === 0) continue;
+
+      const newMap = s.map.map((row) => row.map((hex) => ({ ...hex, units: [...hex.units] })));
+      newMap[hexCoord.row][hexCoord.col] = {
+        ...newMap[hexCoord.row][hexCoord.col],
+        units: newMap[hexCoord.row][hexCoord.col].units.filter((u) => !unitIds.includes(u.id)),
+      };
+      newMap[destinationCoord.row][destinationCoord.col] = {
+        ...newMap[destinationCoord.row][destinationCoord.col],
+        units: [...newMap[destinationCoord.row][destinationCoord.col].units, ...unitsToMove],
+      };
+      s = { ...s, map: newMap };
+    }
+  }
+
   // Combat
   const { state: stateAfterCombat, combatResults } = resolveCombat(s, theme, prng.fork());
   s = stateAfterCombat;
   logs.push(logPhase('combat', ['Combat resolved']));
 
-  // Control transfer — sole occupant claims the hex
+  // Control transfer — sole occupant claims the hex; track transfers for tension
+  const controlBefore: Record<string, string | null> = {};
+  for (const row of s.map) {
+    for (const hex of row) {
+      controlBefore[`${hex.coord.col},${hex.coord.row}`] = hex.controlledBy;
+    }
+  }
   s = resolveControlTransfer(s);
+  const controlTransfers: Array<{ hexCoord: { col: number; row: number }; newOwner: string; previousOwner: string | null }> = [];
+  for (const row of s.map) {
+    for (const hex of row) {
+      const key = `${hex.coord.col},${hex.coord.row}`;
+      const prev = controlBefore[key] ?? null;
+      if (hex.controlledBy && hex.controlledBy !== prev && hex.settlement) {
+        controlTransfers.push({ hexCoord: hex.coord, newOwner: hex.controlledBy, previousOwner: prev });
+      }
+    }
+  }
 
   // Economy
   s = resolveEconomy(s, theme);
@@ -896,6 +1292,55 @@ export function resolveTurn(
   s = resolveEvents(s, allOrders, theme, prng.fork());
   logs.push(logPhase('events', ['Events resolved']));
 
+  // Tension accumulation
+  const diplomacyProposals: Array<{ source: string; target: string; actionType: string }> = [];
+  for (const po of allOrders) {
+    for (const order of po.orders) {
+      if (order.kind === 'diplomatic') {
+        diplomacyProposals.push({ source: po.civilizationId, target: order.targetCivId, actionType: order.actionType });
+      }
+    }
+  }
+  // Detect new alliances formed this turn
+  const newAlliancePairs: Array<[string, string]> = [];
+  for (const civId of Object.keys(s.civilizations)) {
+    const rels = s.civilizations[civId].diplomaticRelations;
+    const before = resourcesBefore[civId] ? state.civilizations[civId]?.diplomaticRelations : {};
+    for (const [otherId, rel] of Object.entries(rels)) {
+      if (rel === 'alliance' && before && before[otherId] !== 'alliance' && civId < otherId) {
+        newAlliancePairs.push([civId, otherId]);
+      }
+    }
+  }
+  // Track constructed buildings
+  const constructedBuildings: Array<{ civId: string; buildingId: string }> = [];
+  for (const po of allOrders) {
+    for (const order of po.orders) {
+      if (order.kind === 'construction') {
+        constructedBuildings.push({ civId: po.civilizationId, buildingId: order.buildingDefinitionId });
+      }
+    }
+  }
+  // Track newly completed techs
+  const completedTechsThisTurn: Array<{ civId: string; techId: string }> = [];
+  for (const [civId, civ] of Object.entries(s.civilizations)) {
+    const before = completedTechsBefore[civId] ?? [];
+    for (const techId of civ.completedTechs) {
+      if (!before.includes(techId)) {
+        completedTechsThisTurn.push({ civId, techId });
+      }
+    }
+  }
+
+  const tensionResult = resolveTension(s, theme, diplomacyProposals, newAlliancePairs, controlTransfers, constructedBuildings, completedTechsThisTurn);
+  s = tensionResult.state;
+  logs.push(tensionResult.log);
+
+  // Muwardi invasion check
+  const muwardiResult = resolveMuwardiInvasion(s, theme, prng.fork());
+  s = muwardiResult.state;
+  logs.push(muwardiResult.log);
+
   // Attrition & Stability
   const attritionResult = resolveAttrition(s, theme);
   s = attritionResult.state;
@@ -906,7 +1351,7 @@ export function resolveTurn(
   s = victoryResult.state;
   logs.push(victoryResult.log);
 
-  // Summary (with real resource deltas, tech completion, combat results, and movement)
+  // Summary (with real resource deltas, tech completion, combat results, movement, and messages)
   const summaryResult = generateSummary(
     s,
     theme,
@@ -915,6 +1360,7 @@ export function resolveTurn(
     completedTechsBefore,
     combatResults,
     movementResult.log.messages,
+    diplomaticMessages,
   );
   s = summaryResult.state;
   logs.push(summaryResult.log);

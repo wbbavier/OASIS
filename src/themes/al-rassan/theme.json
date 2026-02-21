@@ -9,6 +9,7 @@
       "name": "Kingdom of Ragosa",
       "description": "The most cultured of the Asharite kingdoms, Ragosa is a city of scholars, poets, and merchants. Rich in dinars and faith, it has long maintained a precarious peace through diplomacy and patronage.",
       "color": "#C9A84C",
+      "religion": "asharite",
       "startingResources": {
         "dinars": 60,
         "grain": 30,
@@ -31,6 +32,7 @@
       "name": "Emirate of Cartada",
       "description": "The most aggressive of the Asharite kingdoms, Cartada's armies are feared from the northern passes to the southern straits. It hungers for the ruins of the old Caliphate.",
       "color": "#8B1A1A",
+      "religion": "asharite",
       "startingResources": {
         "dinars": 30,
         "grain": 30,
@@ -53,6 +55,7 @@
       "name": "Kingdom of Valledo",
       "description": "The strongest of the Jaddite kingdoms, Valledo's knights and cavalry press south in the name of Jad. Its faith is burning and its armies are disciplined.",
       "color": "#1A3A6B",
+      "religion": "jaddite",
       "startingResources": {
         "dinars": 30,
         "grain": 35,
@@ -75,6 +78,7 @@
       "name": "Kingdom of Ruenda",
       "description": "The Jaddite kingdom of the eastern coast, Ruenda is a kingdom of merchants and cavalry. It trades as readily as it fights, and its horses are the finest in the peninsula.",
       "color": "#5B2E8C",
+      "religion": "jaddite",
       "startingResources": {
         "dinars": 40,
         "grain": 30,
@@ -97,6 +101,7 @@
       "name": "The Kindath",
       "description": "The silver-robed wanderers, the Kindath are physicians, merchants, and astronomers. They have no kingdom, only a quarter in every city. Rich in trade goods and dinars, they have no army — only their wits.",
       "color": "#B0B0B8",
+      "religion": "kindath",
       "startingResources": {
         "dinars": 70,
         "grain": 20,
@@ -113,6 +118,22 @@
         "Silver Road: May offer trade deals with any civ regardless of diplomatic state"
       ],
       "flavor": "The Kindath follow the two moons that are their holy symbol. They are welcome everywhere and safe nowhere. They have survived three hundred years of al-Rassan by being indispensable."
+    },
+    {
+      "id": "muwardi",
+      "name": "The Muwardis",
+      "description": "Zealot warriors from across the southern straits, the Muwardis answer to a purer, harder interpretation of the Asharite faith. They do not negotiate. They do not trade. They conquer.",
+      "color": "#8B0000",
+      "religion": "asharite",
+      "startingResources": {},
+      "startingTechs": [],
+      "uniqueUnits": ["muwardi-warrior", "muwardi-zealot"],
+      "uniqueBuildings": [],
+      "specialAbilities": [
+        "Zealot Fury: Units gain +5 combat strength when attacking",
+        "No Retreat: Units fight to the death (no retreat mechanics)"
+      ],
+      "flavor": "They crossed the sea in silence. They knelt on the beach and prayed. Then they began to kill."
     }
   ],
   "map": {
@@ -1057,6 +1078,32 @@
       "prerequisiteTech": null,
       "canGarrison": true,
       "flavor": "The Kindath have always needed protection. They learned, long ago, to provide it for themselves."
+    },
+    {
+      "id": "muwardi-warrior",
+      "name": "Muwardi Warrior",
+      "description": "Heavy infantry from across the sea, fanatically devoted to their cause and terrifyingly disciplined.",
+      "cost": 0,
+      "upkeep": 0,
+      "strength": 6,
+      "morale": 8,
+      "moves": 2,
+      "prerequisiteTech": null,
+      "canGarrison": false,
+      "flavor": "They do not speak your language. They do not want your gold. They want your submission."
+    },
+    {
+      "id": "muwardi-zealot",
+      "name": "Muwardi Zealot",
+      "description": "Elite warriors who have sworn to die rather than retreat. Their faith makes them fearless.",
+      "cost": 0,
+      "upkeep": 0,
+      "strength": 8,
+      "morale": 10,
+      "moves": 2,
+      "prerequisiteTech": null,
+      "canGarrison": false,
+      "flavor": "They pray before battle. They do not pray for victory — they pray for the courage to die well."
     }
   ],
   "events": [
