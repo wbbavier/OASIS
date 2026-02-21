@@ -1,5 +1,5 @@
 import type { TerrainType } from '@/engine/types';
-import { TERRAIN_FILL } from '@/components/map/HexMap';
+import { TERRAIN_FILL } from '@/components/map/hex-utils';
 
 const TERRAIN_LABELS: Array<{ terrain: TerrainType; label: string }> = [
   { terrain: 'plains', label: 'Plains' },
