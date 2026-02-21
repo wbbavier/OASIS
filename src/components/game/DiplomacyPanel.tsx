@@ -28,6 +28,8 @@ export function DiplomacyPanel({
   gameState, theme, currentCivId, pendingOrders, setPendingOrders,
 }: DiplomacyPanelProps) {
   const [messageText, setMessageText] = useState<Record<string, string>>({});
+  const [tradeOffers, setTradeOffers] = useState<Record<string, Record<string, number>>>({});
+  const [tradeRequests, setTradeRequests] = useState<Record<string, Record<string, number>>>({});
   const civ = gameState.civilizations[currentCivId];
   if (!civ) return null;
 
@@ -57,7 +59,12 @@ export function DiplomacyPanel({
       return;
     }
     const payload: Record<string, unknown> =
-      actionType === 'send_message' ? { message: messageText[targetCivId] ?? '' } : {};
+      actionType === 'send_message' ? { message: messageText[targetCivId] ?? '' }
+      : actionType === 'offer_trade' ? {
+          offer: tradeOffers[targetCivId] ?? {},
+          request: tradeRequests[targetCivId] ?? {},
+        }
+      : {};
     setPendingOrders([
       ...pendingOrders.filter(
         (o) => !(o.kind === 'diplomatic' && (o as DiplomaticAction).targetCivId === targetCivId)
@@ -77,6 +84,23 @@ export function DiplomacyPanel({
           (o) => !(o.kind === 'diplomatic' && (o as DiplomaticAction).targetCivId === targetCivId)
         ),
         { ...existing, payload: { message: text } },
+      ]);
+    }
+  }
+
+  function handleTradeChange(targetCivId: string, offer: Record<string, number>, request: Record<string, number>) {
+    setTradeOffers((prev) => ({ ...prev, [targetCivId]: offer }));
+    setTradeRequests((prev) => ({ ...prev, [targetCivId]: request }));
+    // Update the pending order if offer_trade is selected
+    const existing = pendingOrders.find(
+      (o): o is DiplomaticAction => o.kind === 'diplomatic' && o.targetCivId === targetCivId
+    );
+    if (existing?.actionType === 'offer_trade') {
+      setPendingOrders([
+        ...pendingOrders.filter(
+          (o) => !(o.kind === 'diplomatic' && (o as DiplomaticAction).targetCivId === targetCivId)
+        ),
+        { ...existing, payload: { offer, request } },
       ]);
     }
   }
@@ -114,7 +138,11 @@ export function DiplomacyPanel({
             options={options} pending={pending}
             messageText={messageText[civDef.id] ?? ''}
             onAction={(at) => handleAction(civDef.id, at)}
-            onMessageChange={(t) => handleMessageChange(civDef.id, t)} />
+            onMessageChange={(t) => handleMessageChange(civDef.id, t)}
+            resources={theme.resources}
+            tradeOffer={tradeOffers[civDef.id]}
+            tradeRequest={tradeRequests[civDef.id]}
+            onTradeChange={(o, r) => handleTradeChange(civDef.id, o, r)} />
         );
       })}
     </div>

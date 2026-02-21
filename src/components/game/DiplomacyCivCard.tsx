@@ -1,7 +1,7 @@
 // Individual civilization diplomacy card for DiplomacyPanel.
 
 import type { DiplomaticAction, DiplomaticActionType } from '@/engine/types';
-import type { CivilizationDefinition, DiplomacyOption } from '@/themes/schema';
+import type { CivilizationDefinition, DiplomacyOption, ResourceDefinition } from '@/themes/schema';
 
 interface DiplomacyCivCardProps {
   civDef: CivilizationDefinition;
@@ -13,11 +13,16 @@ interface DiplomacyCivCardProps {
   messageText: string;
   onAction: (actionType: DiplomaticActionType) => void;
   onMessageChange: (text: string) => void;
+  resources?: ResourceDefinition[];
+  tradeOffer?: Record<string, number>;
+  tradeRequest?: Record<string, number>;
+  onTradeChange?: (offer: Record<string, number>, request: Record<string, number>) => void;
 }
 
 export function DiplomacyCivCard({
   civDef, relationLabel, relationColor, options, pending,
   messageText, onAction, onMessageChange,
+  resources, tradeOffer, tradeRequest, onTradeChange,
 }: DiplomacyCivCardProps) {
   return (
     <div className="rounded-lg border border-stone-700 bg-stone-800 p-3">
@@ -66,6 +71,42 @@ export function DiplomacyCivCard({
                     value={messageText}
                     onChange={(e) => onMessageChange(e.target.value)}
                   />
+                )}
+                {actionType === 'offer_trade' && isSelected && resources && onTradeChange && (
+                  <div className="mt-1 space-y-1.5 rounded border border-stone-600 bg-stone-900 p-2">
+                    <div>
+                      <p className="text-[10px] text-stone-500 uppercase tracking-wide mb-1">You offer</p>
+                      {resources.map((r) => (
+                        <div key={`offer-${r.id}`} className="flex items-center gap-1.5 mb-0.5">
+                          <span className="text-xs text-stone-400 w-20 truncate">{r.name}</span>
+                          <input type="number" min={0} max={999}
+                            className="w-14 rounded border border-stone-600 bg-stone-800 px-1 py-0.5 text-xs text-stone-200 focus:outline-none focus:border-blue-500"
+                            value={tradeOffer?.[r.id] ?? 0}
+                            onChange={(e) => {
+                              const v = Math.max(0, parseInt(e.target.value) || 0);
+                              onTradeChange({ ...tradeOffer, [r.id]: v }, tradeRequest ?? {});
+                            }}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-stone-500 uppercase tracking-wide mb-1">You request</p>
+                      {resources.map((r) => (
+                        <div key={`req-${r.id}`} className="flex items-center gap-1.5 mb-0.5">
+                          <span className="text-xs text-stone-400 w-20 truncate">{r.name}</span>
+                          <input type="number" min={0} max={999}
+                            className="w-14 rounded border border-stone-600 bg-stone-800 px-1 py-0.5 text-xs text-stone-200 focus:outline-none focus:border-blue-500"
+                            value={tradeRequest?.[r.id] ?? 0}
+                            onChange={(e) => {
+                              const v = Math.max(0, parseInt(e.target.value) || 0);
+                              onTradeChange(tradeOffer ?? {}, { ...tradeRequest, [r.id]: v });
+                            }}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 )}
               </div>
             );

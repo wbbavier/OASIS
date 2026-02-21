@@ -246,7 +246,11 @@ export function getCustomTechEffectValue(
 // Main economy resolution
 // ---------------------------------------------------------------------------
 
-export function resolveEconomy(state: GameState, theme: ThemePackage): GameState {
+export function resolveEconomy(
+  state: GameState,
+  theme: ThemePackage,
+  allocationOrders?: Record<string, Record<string, number>>,
+): GameState {
   const seasonEffect = getCurrentSeasonEffect(state.turn, theme);
   const allHexes: Hex[] = state.map.flat();
 
@@ -472,6 +476,20 @@ export function resolveEconomy(state: GameState, theme: ThemePackage): GameState
               yieldAccum[conv.to] = (yieldAccum[conv.to] ?? 0) + conv.toAmount;
             }
           }
+        }
+      }
+    }
+
+    // Resource allocation: weight settlement yields by allocation percentages
+    const allocations = allocationOrders?.[civId];
+    if (allocations) {
+      const resourceCount = theme.resources.length;
+      const defaultPct = resourceCount > 0 ? 100 / resourceCount : 100;
+      for (const resource of theme.resources) {
+        const pct = allocations[resource.id] ?? defaultPct;
+        const ratio = pct / defaultPct;
+        if (ratio !== 1 && yieldAccum[resource.id] !== undefined) {
+          yieldAccum[resource.id] = yieldAccum[resource.id] * ratio;
         }
       }
     }

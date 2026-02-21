@@ -1283,8 +1283,16 @@ export function resolveTurn(
     }
   }
 
-  // Economy
-  s = resolveEconomy(s, theme);
+  // Economy — collect resource allocation orders
+  const allocationOrders: Record<string, Record<string, number>> = {};
+  for (const po of allOrders) {
+    for (const order of po.orders) {
+      if (order.kind === 'resource_allocation') {
+        allocationOrders[po.civilizationId] = order.allocations;
+      }
+    }
+  }
+  s = resolveEconomy(s, theme, Object.keys(allocationOrders).length > 0 ? allocationOrders : undefined);
   logs.push(logPhase('economy', ['Economy resolved']));
 
   // Cultural victory progress — add tech effect value to faith per turn

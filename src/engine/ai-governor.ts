@@ -494,11 +494,60 @@ export function generateAIOrders(
     }
   }
 
+  // --- Heuristic: Trade offers ---
+  function doTrade(): void {
+    if (personality === 'military') return; // military rarely trades
+    const resourceIds = theme.resources.map((r) => r.id);
+    if (resourceIds.length < 2) return;
+
+    // Compute average across resources
+    const amounts = resourceIds.map((r) => civ.resources[r] ?? 0);
+    const avg = amounts.reduce((a, b) => a + b, 0) / amounts.length;
+    if (avg <= 0) return;
+
+    // Find surplus (>150% of avg) and deficit (<50% of avg)
+    const surplusThreshold = personality === 'merchant' ? 1.2 : 1.5;
+    const deficitThreshold = personality === 'merchant' ? 0.7 : 0.5;
+    const surplus: Array<{ id: string; amount: number }> = [];
+    const deficit: Array<{ id: string; amount: number }> = [];
+    for (const r of resourceIds) {
+      const amount = civ.resources[r] ?? 0;
+      if (amount > avg * surplusThreshold) surplus.push({ id: r, amount: Math.floor((amount - avg) / 2) });
+      else if (amount < avg * deficitThreshold) deficit.push({ id: r, amount: Math.floor(avg - amount) });
+    }
+
+    if (surplus.length === 0 || deficit.length === 0) return;
+
+    // Offer first surplus for first deficit to first non-war civ
+    const allCivIds = Object.keys(state.civilizations).filter(
+      (id) => id !== civId && !state.civilizations[id].isEliminated &&
+        civ.diplomaticRelations[id] !== 'war',
+    );
+    if (allCivIds.length === 0) return;
+
+    const targetId = allCivIds[0];
+    const offerRes = surplus[0];
+    const requestRes = deficit[0];
+    const tradeAmount = Math.min(offerRes.amount, requestRes.amount, 10);
+    if (tradeAmount <= 0) return;
+
+    orders.push({
+      kind: 'diplomatic',
+      actionType: 'offer_trade',
+      targetCivId: targetId,
+      payload: {
+        offer: { [offerRes.id]: tradeAmount },
+        request: { [requestRes.id]: tradeAmount },
+      },
+    });
+  }
+
   // --- Personality-driven priority ordering ---
   const heuristics: Record<string, () => void> = {
     garrison: garrisonCapital,
     recruit: doRecruit,
     diplomacy: doDiplomacy,
+    trade: doTrade,
     attack: attackEnemies,
     expand: expandToUnclaimed,
     research: doResearch,
@@ -508,9 +557,9 @@ export function generateAIOrders(
 
   const priorityMap: Record<AIPersonality, string[]> = {
     military: ['garrison', 'recruit', 'diplomacy', 'attack', 'expand', 'events', 'research', 'build'],
-    diplomatic: ['garrison', 'diplomacy', 'events', 'research', 'recruit', 'build', 'expand', 'attack'],
-    merchant: ['garrison', 'diplomacy', 'expand', 'events', 'recruit', 'build', 'research', 'attack'],
-    pacifist: ['diplomacy', 'events', 'research', 'recruit', 'build'],
+    diplomatic: ['garrison', 'diplomacy', 'trade', 'events', 'research', 'recruit', 'build', 'expand', 'attack'],
+    merchant: ['garrison', 'diplomacy', 'trade', 'expand', 'events', 'recruit', 'build', 'research', 'attack'],
+    pacifist: ['diplomacy', 'trade', 'events', 'research', 'recruit', 'build'],
   };
 
   const priorities = priorityMap[personality];

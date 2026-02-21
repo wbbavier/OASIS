@@ -97,6 +97,13 @@ export interface DiplomacyResult {
   diplomaticMessages: DiplomaticMessage[];
 }
 
+export interface TradeExecution {
+  civA: string;
+  civB: string;
+  aGives: Record<string, number>;
+  bGives: Record<string, number>;
+}
+
 export function resolveDiplomacy(
   state: GameState,
   orders: PlayerOrders[],
@@ -181,7 +188,7 @@ export function resolveDiplomacy(
         break;
       }
 
-      // offer_trade — no relation change
+      // offer_trade — handled in mutual matching below
       case 'offer_trade':
         break;
 
@@ -214,6 +221,85 @@ export function resolveDiplomacy(
       }
       // If not mutual, the proposal is logged but has no effect
     }
+  }
+
+  // Process trade offers — match compatible trades
+  const tradeOffers = proposals.filter((p) => p.actionType === 'offer_trade');
+  const matchedTradeKeys = new Set<string>();
+  const executedTrades: TradeExecution[] = [];
+
+  for (const offer of tradeOffers) {
+    const offerKey = `${offer.source}->${offer.target}`;
+    if (matchedTradeKeys.has(offerKey)) continue;
+
+    const offerPayloadRaw = offer.payload as { offer?: Record<string, number>; request?: Record<string, number> } | undefined;
+    if (!offerPayloadRaw?.offer || !offerPayloadRaw?.request) continue;
+    const offerPayload = { offer: offerPayloadRaw.offer, request: offerPayloadRaw.request };
+
+    // Find a counter-offer from target to source
+    const counterOffer = tradeOffers.find((p) => {
+      if (p.source !== offer.target || p.target !== offer.source) return false;
+      const counterKey = `${p.source}->${p.target}`;
+      if (matchedTradeKeys.has(counterKey)) return false;
+      const cp = p.payload as { offer?: Record<string, number>; request?: Record<string, number> } | undefined;
+      if (!cp?.offer || !cp?.request) return false;
+
+      // Match: A offers what B requests and B offers what A requests
+      for (const [resId, amount] of Object.entries(offerPayload.offer)) {
+        if ((cp.request[resId] ?? 0) > amount) return false;
+      }
+      for (const [resId, amount] of Object.entries(offerPayload.request)) {
+        if ((cp.offer[resId] ?? 0) < amount) return false;
+      }
+      return true;
+    });
+
+    if (!counterOffer) continue;
+
+    const counterPayload = counterOffer.payload as { offer: Record<string, number>; request: Record<string, number> };
+
+    // Validate both sides have sufficient resources
+    const civA = civs[offer.source];
+    const civB = civs[offer.target];
+    if (!civA || !civB) continue;
+
+    let aCanAfford = true;
+    for (const [resId, amount] of Object.entries(offerPayload.offer)) {
+      if ((civA.resources[resId] ?? 0) < amount) { aCanAfford = false; break; }
+    }
+    let bCanAfford = true;
+    for (const [resId, amount] of Object.entries(counterPayload.offer)) {
+      if ((civB.resources[resId] ?? 0) < amount) { bCanAfford = false; break; }
+    }
+
+    if (!aCanAfford || !bCanAfford) continue;
+
+    // Execute the trade
+    const aRes = { ...civA.resources };
+    const bRes = { ...civB.resources };
+    for (const [resId, amount] of Object.entries(offerPayload.offer)) {
+      aRes[resId] = (aRes[resId] ?? 0) - amount;
+      bRes[resId] = (bRes[resId] ?? 0) + amount;
+    }
+    for (const [resId, amount] of Object.entries(counterPayload.offer)) {
+      bRes[resId] = (bRes[resId] ?? 0) - amount;
+      aRes[resId] = (aRes[resId] ?? 0) + amount;
+    }
+
+    civs = {
+      ...civs,
+      [offer.source]: { ...civA, resources: aRes },
+      [offer.target]: { ...civB, resources: bRes },
+    };
+
+    matchedTradeKeys.add(offerKey);
+    matchedTradeKeys.add(`${counterOffer.source}->${counterOffer.target}`);
+    executedTrades.push({
+      civA: offer.source,
+      civB: offer.target,
+      aGives: offerPayload.offer,
+      bGives: counterPayload.offer,
+    });
   }
 
   return { state: { ...state, civilizations: civs }, diplomaticMessages };
