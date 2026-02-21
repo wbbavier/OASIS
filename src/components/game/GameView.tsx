@@ -138,7 +138,7 @@ export function GameView({
             reachableCoords={reachableCoords} fogOfWar={gameState.config.fogOfWar} />
           <TerrainLegend />
         </div>
-        <div className="w-full lg:w-72 flex-shrink-0 flex flex-col gap-3">
+        <div className="w-full lg:w-72 flex-shrink-0 flex flex-col gap-3 max-h-[40vh] md:max-h-none overflow-y-auto">
           {civ && civDef && (
             <CivDashboard civ={civ} civDef={civDef} allCivDefs={theme.civilizations}
               resources={theme.resources} turn={gameState.turn} resourceDeltas={resourceDeltas} />

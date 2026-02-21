@@ -41,7 +41,7 @@ export function TurnBanner({ gameState, theme, civId, civColor, civName }: TurnB
   };
 
   return (
-    <div className="flex items-center gap-3 rounded-lg border border-stone-700 bg-stone-900 px-4 py-2">
+    <div className="flex flex-wrap items-center gap-3 rounded-lg border border-stone-700 bg-stone-900 px-4 py-2">
       {/* Civ identity */}
       <div className="flex items-center gap-2">
         <span className="h-3 w-3 rounded-full flex-shrink-0" style={{ backgroundColor: civColor }} />
@@ -69,7 +69,7 @@ export function TurnBanner({ gameState, theme, civId, civColor, civName }: TurnB
 
       {/* Compact resources */}
       {civ && (
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           {resources.slice(0, 4).map((r) => {
             const icon = resourceIcons[r.id] ?? '';
             const val = civ.resources[r.id] ?? 0;

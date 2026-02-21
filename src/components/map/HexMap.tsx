@@ -39,6 +39,7 @@ export function HexMap({
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [dragging, setDragging] = useState(false);
   const dragStart = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
+  const pinchStart = useRef<{ dist: number; zoom: number } | null>(null);
 
   const [hoveredCoord, setHoveredCoord] = useState<HexCoord | null>(null);
 
@@ -78,6 +79,28 @@ export function HexMap({
 
   const handlePointerUp = useCallback(() => setDragging(false), []);
 
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      pinchStart.current = { dist: Math.hypot(dx, dy), zoom };
+    }
+  }, [zoom]);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (e.touches.length === 2 && pinchStart.current) {
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      const newDist = Math.hypot(dx, dy);
+      const scale = newDist / pinchStart.current.dist;
+      setZoom(Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, pinchStart.current.zoom * scale)));
+    }
+  }, []);
+
+  const handleTouchEnd = useCallback(() => {
+    pinchStart.current = null;
+  }, []);
+
   const centerCapital = useCallback(() => {
     if (!currentCivId || !containerRef.current) return;
     for (const rowArr of map) {
@@ -105,7 +128,9 @@ export function HexMap({
         style={{ height: '65vh', touchAction: 'none' }}
         onWheel={handleWheel} onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove} onPointerUp={handlePointerUp}
-        onPointerLeave={handlePointerUp}>
+        onPointerLeave={handlePointerUp}
+        onTouchStart={handleTouchStart} onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}>
         <svg width={svgW} height={svgH}
           style={{
             display: 'block',
