@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import type { GameState, AnyOrder, DiplomaticAction, DiplomaticActionType, RelationshipState } from '@/engine/types';
 import type { ThemePackage } from '@/themes/schema';
+import { DiplomacyCivCard } from './DiplomacyCivCard';
 
 interface DiplomacyPanelProps {
   gameState: GameState;
@@ -12,11 +13,7 @@ interface DiplomacyPanelProps {
 }
 
 const RELATION_LABELS: Record<RelationshipState, string> = {
-  peace: 'Peace',
-  alliance: 'Alliance',
-  war: 'War',
-  truce: 'Truce',
-  vassal: 'Vassal',
+  peace: 'Peace', alliance: 'Alliance', war: 'War', truce: 'Truce', vassal: 'Vassal',
 };
 
 const RELATION_COLORS: Record<RelationshipState, string> = {
@@ -28,55 +25,52 @@ const RELATION_COLORS: Record<RelationshipState, string> = {
 };
 
 export function DiplomacyPanel({
-  gameState,
-  theme,
-  currentCivId,
-  pendingOrders,
-  setPendingOrders,
+  gameState, theme, currentCivId, pendingOrders, setPendingOrders,
 }: DiplomacyPanelProps) {
   const [messageText, setMessageText] = useState<Record<string, string>>({});
-
   const civ = gameState.civilizations[currentCivId];
   if (!civ) return null;
 
   const otherCivDefs = theme.civilizations.filter((c) => c.id !== currentCivId);
 
-  function getRelation(targetCivId: string): RelationshipState {
-    return civ.diplomaticRelations[targetCivId] ?? 'peace';
+  // Extract received messages from last turn
+  const lastSummary = gameState.turnHistory.at(-1) ?? null;
+  const receivedMessages: Array<{ fromCivId: string; message: string }> = [];
+  if (lastSummary) {
+    const myCivEntry = lastSummary.entries.find((e) => e.civId === currentCivId);
+    if (myCivEntry) {
+      for (const line of myCivEntry.narrativeLines) {
+        const match = line.match(/^Message from ([^:]+): (.+)$/);
+        if (match) receivedMessages.push({ fromCivId: match[1], message: match[2] });
+      }
+    }
   }
 
-  function getPendingAction(targetCivId: string): DiplomaticAction | undefined {
-    return pendingOrders.find(
+  function handleAction(targetCivId: string, actionType: DiplomaticActionType) {
+    const existing = pendingOrders.find(
       (o): o is DiplomaticAction => o.kind === 'diplomatic' && o.targetCivId === targetCivId
     );
-  }
-
-  function selectAction(targetCivId: string, actionType: DiplomaticActionType) {
-    const existing = getPendingAction(targetCivId);
     if (existing?.actionType === actionType) {
-      // deselect
-      setPendingOrders(
-        pendingOrders.filter(
-          (o) => !(o.kind === 'diplomatic' && (o as DiplomaticAction).targetCivId === targetCivId)
-        )
-      );
+      setPendingOrders(pendingOrders.filter(
+        (o) => !(o.kind === 'diplomatic' && (o as DiplomaticAction).targetCivId === targetCivId)
+      ));
       return;
     }
     const payload: Record<string, unknown> =
       actionType === 'send_message' ? { message: messageText[targetCivId] ?? '' } : {};
-    const next: DiplomaticAction = { kind: 'diplomatic', actionType, targetCivId, payload };
     setPendingOrders([
       ...pendingOrders.filter(
         (o) => !(o.kind === 'diplomatic' && (o as DiplomaticAction).targetCivId === targetCivId)
       ),
-      next,
+      { kind: 'diplomatic', actionType, targetCivId, payload },
     ]);
   }
 
-  function updateMessage(targetCivId: string, text: string) {
+  function handleMessageChange(targetCivId: string, text: string) {
     setMessageText((prev) => ({ ...prev, [targetCivId]: text }));
-    // If send_message is already pending for this civ, update its payload
-    const existing = getPendingAction(targetCivId);
+    const existing = pendingOrders.find(
+      (o): o is DiplomaticAction => o.kind === 'diplomatic' && o.targetCivId === targetCivId
+    );
     if (existing?.actionType === 'send_message') {
       setPendingOrders([
         ...pendingOrders.filter(
@@ -88,78 +82,39 @@ export function DiplomacyPanel({
   }
 
   if (otherCivDefs.length === 0) {
-    return <p className="text-sm text-stone-500 italic">No other civilizations in this game.</p>;
+    return <p className="text-sm text-stone-500 italic">No other civilizations.</p>;
   }
 
   return (
     <div className="space-y-4">
+      {receivedMessages.length > 0 && (
+        <div className="rounded-lg border border-amber-700 bg-amber-950/40 p-3 space-y-2">
+          <p className="text-xs font-semibold text-amber-300 uppercase tracking-wide">Messages Received</p>
+          {receivedMessages.map((msg, i) => {
+            const senderDef = theme.civilizations.find((c) => c.id === msg.fromCivId);
+            return (
+              <div key={i} className="text-sm text-stone-200">
+                <span className="font-medium text-amber-200">{senderDef?.name ?? msg.fromCivId}:</span>{' '}
+                {msg.message}
+              </div>
+            );
+          })}
+        </div>
+      )}
       <p className="text-xs text-stone-500">Select a diplomatic action for each civilization.</p>
       {otherCivDefs.map((civDef) => {
-        const relation = getRelation(civDef.id);
-        const pending = getPendingAction(civDef.id);
-        const availableOptions = theme.diplomacyOptions.filter((opt) =>
-          opt.allowedStates.includes(relation)
+        const relation = civ.diplomaticRelations[civDef.id] ?? 'peace';
+        const pending = pendingOrders.find(
+          (o): o is DiplomaticAction => o.kind === 'diplomatic' && o.targetCivId === civDef.id
         );
-
+        const options = theme.diplomacyOptions.filter((opt) => opt.allowedStates.includes(relation));
         return (
-          <div key={civDef.id} className="rounded-lg border border-stone-700 bg-stone-800 p-3">
-            <div className="flex items-center gap-2 mb-2">
-              <div
-                className="h-3 w-3 rounded-full shrink-0"
-                style={{ backgroundColor: civDef.color }}
-              />
-              <span className="text-sm font-semibold text-stone-100">{civDef.name}</span>
-              <span
-                className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${RELATION_COLORS[relation]}`}
-              >
-                {RELATION_LABELS[relation]}
-              </span>
-            </div>
-
-            {availableOptions.length === 0 ? (
-              <p className="text-xs text-stone-600 italic">No actions available.</p>
-            ) : (
-              <div className="space-y-1.5">
-                {availableOptions.map((opt) => {
-                  const actionType = opt.actionType as DiplomaticActionType;
-                  const isSelected = pending?.actionType === actionType;
-                  return (
-                    <div key={actionType}>
-                      <button
-                        onClick={() => selectAction(civDef.id, actionType)}
-                        className={`w-full text-left rounded border px-2.5 py-1.5 transition-colors ${
-                          isSelected
-                            ? 'border-blue-500 bg-blue-900/40'
-                            : 'border-stone-600 hover:border-stone-500 bg-stone-900/50'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <div>
-                            <span className="text-sm text-stone-100 capitalize">
-                              {actionType.replace(/_/g, ' ')}
-                            </span>
-                            <p className="text-xs text-stone-400 mt-0.5">{opt.description}</p>
-                          </div>
-                          {isSelected && (
-                            <span className="text-[10px] text-blue-400 shrink-0">Selected</span>
-                          )}
-                        </div>
-                      </button>
-                      {actionType === 'send_message' && isSelected && (
-                        <textarea
-                          className="mt-1 w-full rounded border border-stone-600 bg-stone-900 px-2 py-1.5 text-xs text-stone-200 placeholder-stone-600 resize-none focus:outline-none focus:border-blue-500"
-                          rows={2}
-                          placeholder="Your message…"
-                          value={messageText[civDef.id] ?? ''}
-                          onChange={(e) => updateMessage(civDef.id, e.target.value)}
-                        />
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+          <DiplomacyCivCard key={civDef.id} civDef={civDef} relation={relation}
+            relationLabel={RELATION_LABELS[relation]} relationColor={RELATION_COLORS[relation]}
+            options={options} pending={pending}
+            messageText={messageText[civDef.id] ?? ''}
+            onAction={(at) => handleAction(civDef.id, at)}
+            onMessageChange={(t) => handleMessageChange(civDef.id, t)} />
         );
       })}
     </div>
